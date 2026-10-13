@@ -156,10 +156,10 @@ const app = {
   myTeams: [], viewTeam: null, tab: 'pool',
   filters: { q: '', pos: 'ALL', team: 'ALL', sort: 'adp', fit: true }, limit: 150,
   serverAvailable: false, serverPool: null, socket: null, connected: false,
-  room: null, token: null, memberId: null, members: [], isHost: false,
+  room: null, token: null, memberId: null, members: [], isHost: false, rev: null, syncing: false,
   deadline: null, botTimer: null, tick: null, lastOnClock: null, freshSlot: null,
   setupTab: 'local',
-  setup: { numTeams: 12, humans: 1, names: ['My Franchise'], seed: E.randomSeed(), pickTimer: 0, botDelay: 500, onlineName: '', joinCode: '', onlineHumans: 4 }
+  setup: { numTeams: 12, humans: 1, names: ['My Franchise'], seed: E.randomSeed(), pickTimer: 0, botDelay: 500, onlineName: '', joinCode: '', onlineHumans: 4, passcode: '', joinPass: '' }
 };
 
 // ---------- Utilities ----------
@@ -214,7 +214,8 @@ function renderHeader() {
   let right = '';
   if (app.mode === 'online' && app.room) {
     right += `<span class="flex items-center gap-1.5 text-sm"><span class="live-dot ${app.connected ? 'on' : ''}"></span>${app.connected ? 'Live' : 'Reconnecting'}</span>
-      <span class="text-sm">Room <b class="font-display text-base tracking-wide">${esc(app.room)}</b></span>`;
+      <span class="text-sm">Room <b class="font-display text-base tracking-wide">${esc(app.room)}</b></span>
+      ${app.state ? `<button class="btn btn-sm" data-action="members">Members</button>` : ''}`;
   } else if (app.mode === 'local') {
     right += `<span class="text-sm text-muted hidden sm:inline">Solo / couch draft</span>`;
   }
@@ -304,8 +305,9 @@ function renderSetup() {
           <div><label class="lbl" for="otimer">Pick clock</label><select id="otimer" class="field" data-bind="pickTimer">${opt(timerOpts, st.pickTimer)}</select></div>
           <div><label class="lbl" for="obot">Bot speed</label><select id="obot" class="field" data-bind="botDelay">${opt(speedOpts, st.botDelay)}</select></div>
         </div>
+        <div><label class="lbl" for="opass">Room passcode (optional)</label><input id="opass" type="password" class="field" data-bind="passcode" maxlength="64" value="${esc(st.passcode)}" autocomplete="new-password"></div>
         <div><label class="lbl" for="oseed">Seed</label><div class="flex gap-2"><input id="oseed" class="field" data-bind="seed" value="${esc(st.seed)}"><button class="btn" data-action="dice" aria-label="New random seed">🎲</button></div></div>
-        <p class="hint">Open human seats that nobody claims become bots when you start.</p>
+        <p class="hint">Open human seats that nobody claims become bots when you start. With a passcode, only friends you give it to can join.</p>
         <button class="btn btn-primary" data-action="create-room">Create room</button>
       </div>
       <div class="space-y-3 border-t border-line pt-5">
@@ -314,6 +316,7 @@ function renderSetup() {
           <input class="field" data-bind="onlineName" value="${esc(st.onlineName)}" placeholder="Your name" aria-label="Your name" maxlength="32">
           <input class="field uppercase tracking-widest" data-bind="joinCode" value="${esc(st.joinCode)}" placeholder="CODE" aria-label="Room code" maxlength="5">
         </div>
+        <input class="field" type="password" data-bind="joinPass" value="${esc(st.joinPass)}" placeholder="Passcode, if the room has one" aria-label="Room passcode" maxlength="64" autocomplete="off">
         <button class="btn" data-action="join-room">Join room</button>
       </div>
     </div>` : `
@@ -432,16 +435,24 @@ function connectSocket() {
   sock.on('connect', () => {
     app.connected = true;
     if (app.room && app.token) {
-      sock.emit('room:join', { roomId: app.room, token: app.token }, res => {
+      // Send the last rev we saw so the server can send only the picks we missed.
+      sock.emit('room:join', { roomId: app.room, token: app.token, proto: 2, lastRev: app.state ? app.rev : null }, res => {
         if (!res.ok) { toast(res.error, 'err'); leaveOnline(); return; }
         app.memberId = res.memberId;
-        onView(res.view);
+        if (res.view) return onView(res.view);
+        for (const m of res.missed) if (!onPicked(m, true)) return;
+        app.state.paused = res.paused;
+        setDeadline(res.deadline, res.serverNow);
+        onPresence({ members: res.members });
       });
     }
     renderHeader();
   });
   sock.on('disconnect', () => { app.connected = false; renderHeader(); });
   sock.on('state', onView);
+  sock.on('draft:picked', m => onPicked(m));
+  sock.on('presence', onPresence);
+  sock.on('room:kicked', () => { toast('The host removed you from the room', 'err'); leaveOnline(); });
   return sock;
 }
 function emit(evt, payload) {
@@ -455,6 +466,7 @@ function emit(evt, payload) {
 function enterRoom(res) {
   app.mode = 'online';
   app.room = res.roomId; app.token = res.token; app.memberId = res.memberId;
+  app.setup.passcode = ''; app.setup.joinPass = '';
   LS.set(ONLINE_KEY, { room: app.room, token: app.token });
   const u = new URL(location.href); u.searchParams.set('room', app.room); history.replaceState(null, '', u);
   onView(res.view);
@@ -462,38 +474,106 @@ function enterRoom(res) {
 async function createRoom() {
   const st = app.setup;
   connectSocket();
-  const res = await emit('room:create', { name: st.onlineName || 'Commissioner', numTeams: st.numTeams, humanSlots: st.onlineHumans, seed: st.seed, pickTimer: st.pickTimer, botDelayMs: st.botDelay });
+  const res = await emit('room:create', { name: st.onlineName || 'Commissioner', numTeams: st.numTeams, humanSlots: st.onlineHumans, seed: st.seed, pickTimer: st.pickTimer, botDelayMs: st.botDelay, passcode: st.passcode, proto: 2 });
   if (res.ok) enterRoom(res);
 }
 async function joinRoom() {
   const st = app.setup;
   if (!st.joinCode) return toast('Enter the room code', 'err');
   connectSocket();
-  const res = await emit('room:join', { roomId: st.joinCode, name: st.onlineName || 'Guest' });
+  const res = await emit('room:join', { roomId: st.joinCode, name: st.onlineName || 'Guest', passcode: st.joinPass, proto: 2 });
   if (res.ok) enterRoom(res);
 }
 function leaveOnline() {
   if (app.socket) app.socket.emit('room:leave', {});
   LS.del(ONLINE_KEY);
-  app.mode = null; app.room = null; app.token = null; app.state = null; app.myTeams = [];
+  app.mode = null; app.room = null; app.token = null; app.state = null; app.myTeams = []; app.rev = null;
+  $('#overlay').innerHTML = '';
   const u = new URL(location.href); u.searchParams.delete('room'); history.replaceState(null, '', u);
   app.screen = 'setup';
   render();
 }
+function setDeadline(deadline, serverNow) {
+  app.deadline = deadline ? deadline - (serverNow - Date.now()) : null;
+}
+function setMembers(members) {
+  app.members = members;
+  const me = members.find(m => m.id === app.memberId);
+  app.isHost = !!(me && me.isHost);
+  app.myTeams = me && me.teamId ? [me.teamId] : [];
+}
 function onView(view) {
   const prevCount = app.state ? app.state.picks.length : 0;
   app.state = view.state;
-  app.members = view.members;
-  const offset = view.serverNow - Date.now();
-  app.deadline = view.deadline ? view.deadline - offset : null;
-  const me = view.members.find(m => m.id === app.memberId);
-  app.isHost = !!(me && me.isHost);
-  app.myTeams = me && me.teamId ? [me.teamId] : [];
+  app.rev = view.rev;
+  setDeadline(view.deadline, view.serverNow);
+  setMembers(view.members);
   if (!app.viewTeam || !team(app.viewTeam)) app.viewTeam = app.myTeams[0] || 'T1';
+  if ($('#members-list')) renderMembers();
   if (app.state.picks.length > prevCount) markFresh(app.state.picks[app.state.picks.length - 1]);
   const next = app.state.status === 'lobby' ? 'lobby' : 'draft';
   if (app.screen !== next || next === 'lobby') { app.screen = next; render(); }
   else updateDraft();
+}
+
+// One pick from the server. Replay it with the shared engine so rules match exactly;
+// any gap or mismatch falls back to a full resync. Returns false if it resynced.
+function onPicked(msg, quiet) {
+  if (app.syncing || !app.state) return false;
+  if (msg.rev !== app.rev + 1) { resync(); return false; }
+  const pk = msg.pick;
+  let mine;
+  try { mine = E.makePick(app.state, app.poolMap, pk.playerId, { teamId: pk.teamId, by: pk.by, force: true }); }
+  catch (e) { resync(); return false; }
+  if (mine.overall !== pk.overall || mine.slot !== pk.slot || app.state.status !== msg.status) { resync(); return false; }
+  app.state.picks[app.state.picks.length - 1] = pk; // keep the server's timestamp
+  app.state.paused = msg.paused;
+  app.rev = msg.rev;
+  if (quiet) return true;
+  setDeadline(msg.deadline, msg.serverNow);
+  markFresh(pk);
+  updateDraft();
+  return true;
+}
+function onPresence(p) {
+  setMembers(p.members);
+  if (app.screen === 'lobby') renderLobby();
+  else if (app.screen === 'draft') updateDraft();
+  if ($('#members-list')) renderMembers();
+}
+function resync() {
+  if (app.syncing || !app.socket) return;
+  app.syncing = true;
+  app.socket.emit('room:sync', {}, res => {
+    app.syncing = false;
+    if (res && res.ok) onView(res.view);
+  });
+}
+
+// ---------- Members (host tools) ----------
+function showMembers() {
+  $('#overlay').innerHTML = `
+    <div class="modal-bg" data-action="close-modal">
+      <div class="card p-5 w-full max-w-lg" role="dialog" aria-modal="true" aria-label="Room members">
+        <div class="flex justify-between items-center mb-3"><h2 class="font-display font-extrabold text-2xl">Members</h2><button class="btn btn-sm" data-action="close-modal">Close</button></div>
+        <div id="members-list"></div>
+      </div>
+    </div>`;
+  renderMembers();
+}
+function renderMembers() {
+  const rows = app.members.map(m => {
+    const t = m.teamId && team(m.teamId);
+    const tools = app.isHost && m.id !== app.memberId
+      ? `<button class="btn btn-sm" data-action="make-host" data-member="${esc(m.id)}">Make host</button>
+         <button class="btn btn-sm" data-action="kick" data-member="${esc(m.id)}" data-name="${esc(m.name)}">Remove</button>` : '';
+    return `<div class="flex items-center justify-between gap-3 py-2 border-b border-line">
+      <span class="flex items-center gap-1.5 min-w-0"><span class="live-dot ${m.online ? 'on' : ''}"></span>
+        <span class="truncate">${m.id === app.memberId ? 'You' : esc(m.name)}${m.isHost ? ' (host)' : ''}</span>
+        <span class="text-muted text-sm truncate">${t ? esc(t.name) : 'watching'}</span></span>
+      <span class="flex gap-1.5 shrink-0">${tools}</span></div>`;
+  }).join('');
+  $('#members-list').innerHTML = rows + (app.isHost ? `<p class="hint mt-3">Removing someone during the draft leaves their team on the clock; the pick clock or your autopick moves it along.</p>` : '');
 }
 
 // ---------- Lobby ----------
@@ -896,6 +976,11 @@ document.addEventListener('click', e => {
     case 'release': emit('team:release'); break;
     case 'start-online': emit('draft:start'); break;
     case 'leave': leaveOnline(); break;
+    case 'members': showMembers(); break;
+    case 'make-host': emit('host:transfer', { memberId: el.dataset.member }).then(r => { if (r.ok) toast('Host handed over'); }); break;
+    case 'kick':
+      if (confirm(`Remove ${el.dataset.name} from the room?`)) emit('member:kick', { memberId: el.dataset.member });
+      break;
     case 'tab': setTab(el.dataset.tab); break;
     case 'pos': app.filters.pos = el.dataset.pos; app.limit = 150; renderChips(); renderPool(); $('#pool-wrap').scrollTop = 0; break;
     case 'more': app.limit += 150; renderPool(); break;

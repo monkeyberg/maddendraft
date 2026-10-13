@@ -27,7 +27,7 @@ The client also supports `?room=CODE` invite links and reconnects with a token s
 
 1. **Host:** Online tab → Create room (teams, human slots, timer, optional passcode) → gets a code and an invite link → lands in the lobby as `T1`.
 2. **Friend:** opens the invite link or enters the code → enters a name (and the passcode if one is set) → joins as a spectator → claims an open team.
-3. **Lobby:** everyone sees who is online and which teams are claimed. The host can remove a member or hand the host role to someone else, then presses Start.
+3. **Lobby:** everyone sees who is online and which teams are claimed. From the Members button (lobby or draft), the host can remove a member or hand the host role to someone else. The host then presses Start.
 4. **Draft:**
    - The team on the clock submits a pick. The server checks it with `E.makePick` and sends `draft:picked` to the room.
    - Each client applies the pick to its own copy of the state with the same engine.
@@ -49,7 +49,7 @@ The client also supports `?room=CODE` invite links and reconnects with a token s
 | Event | Payload | Ack |
 |---|---|---|
 | `room:create` | `{name, numTeams, humanSlots, pickTimer, botDelayMs, seed?, passcode?}` | `{ok, roomId, token, memberId, rev, view}` |
-| `room:join` | `{roomId, name?, token?, passcode?, lastRev?, proto?: 2}` | `{ok, roomId, token, memberId, rev, view?, missed?: Pick[]}` or `{ok:false, error}` |
+| `room:join` | `{roomId, name?, token?, passcode?, lastRev?, proto?: 2}` | `{ok, roomId, token, memberId, rev, view?}` or, on a catch-up, `{..., missed: [{rev, pick}], members, deadline, serverNow, paused}` or `{ok:false, error}` |
 | `room:sync` | `{}` | `{ok, rev, view}` |
 | `member:kick` *(host)* | `{memberId}` | `{ok}` |
 | `host:transfer` *(host)* | `{memberId}` | `{ok}` |
@@ -60,7 +60,7 @@ The client also supports `?room=CODE` invite links and reconnects with a token s
 | Event | Payload |
 |---|---|
 | `state` | `{state, members, deadline, serverNow, rev}`. Sent on lobby, pause and undo changes, and for every change to clients that did not send `proto: 2`. |
-| `draft:picked` | `{rev, pick, deadline, serverNow, status}` |
+| `draft:picked` | `{rev, pick, deadline, serverNow, status, paused}` |
 | `presence` | `{rev, members}` (no draft state) |
 | `room:kicked` | `{}` (sent to the removed socket, which is then disconnected) |
 
@@ -148,7 +148,7 @@ client, on draft:picked(msg):
              {teamId: msg.pick.teamId, by: msg.pick.by, force: true})
   overwrite the new last pick with msg.pick           # keep the server's ts and slot
   if app.state.currentPick != msg.pick.overall: return requestSync()
-  app.rev = msg.rev; app.deadline = msg.deadline; render the changed rows only
+  app.rev = msg.rev; app.deadline = msg.deadline; re-render the draft view
 
 requestSync(): emit room:sync → replace app.state and app.rev with the result
 ```

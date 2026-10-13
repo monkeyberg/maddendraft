@@ -34,8 +34,45 @@ const { pool: POOL, source: POOL_SOURCE } = loadPool();
 const POOL_MAP = E.indexPool(POOL);
 
 // ---------- Sessions ----------
-// sess = { state, members: { token: { name, teamId, isHost } }, online: Map<token, n>, timer, deadline }
+// sess = { state, members: { sha256(token): { memberId, name, teamId, isHost } }, room, online: Map<key, n>,
+//          timer, deadline, pickLog }
+// Members are keyed by a hash of their token, so the raw token is never written to disk.
 const sessions = new Map();
+const MAX_MEMBERS = 64;
+const PICK_LOG = 50; // recent picks kept in memory for reconnect replay
+const IDLE_MS = 14 * 24 * 60 * 60 * 1000;
+const V2 = id => id + ':v2'; // socket.io room for clients that take per-pick deltas
+
+const hashToken = t => crypto.createHash('sha256').update(String(t)).digest('hex');
+const isTokenHash = k => /^[0-9a-f]{64}$/.test(k);
+
+function hashPass(pass) {
+  const salt = crypto.randomBytes(16);
+  return 'scrypt$' + salt.toString('hex') + '$' + crypto.scryptSync(String(pass), salt, 32).toString('hex');
+}
+function checkPass(stored, pass) {
+  const [, salt, hash] = stored.split('$');
+  const got = crypto.scryptSync(String(pass || ''), Buffer.from(salt, 'hex'), 32);
+  return crypto.timingSafeEqual(got, Buffer.from(hash, 'hex'));
+}
+
+function newRoom(passcode) {
+  return { rev: 0, passHash: passcode ? hashPass(passcode) : null, maxMembers: MAX_MEMBERS, lastActiveAt: Date.now() };
+}
+
+// Fixed-window counters per client IP: room creation and failed joins.
+const limits = new Map();
+function hits(key) {
+  const b = limits.get(key);
+  return b && b.resetAt > Date.now() ? b.n : 0;
+}
+function hit(key) {
+  const now = Date.now();
+  let b = limits.get(key);
+  if (!b || b.resetAt <= now) { b = { n: 0, resetAt: now + 60000 }; limits.set(key, b); }
+  return ++b.n;
+}
+setInterval(() => { const now = Date.now(); for (const [k, b] of limits) if (b.resetAt <= now) limits.delete(k); }, 60000).unref();
 
 function roomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -47,7 +84,7 @@ function roomCode() {
 function save(sess) {
   const file = path.join(SESS_DIR, sess.state.id + '.json');
   const tmp = file + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify({ state: sess.state, members: sess.members }));
+  fs.writeFileSync(tmp, JSON.stringify({ state: sess.state, members: sess.members, room: sess.room }));
   fs.renameSync(tmp, file);
 }
 
@@ -56,8 +93,19 @@ function loadSessions() {
     if (!f.endsWith('.json')) continue;
     try {
       const data = JSON.parse(fs.readFileSync(path.join(SESS_DIR, f), 'utf8'));
-      const sess = { state: data.state, members: data.members || {}, online: new Map(), timer: null, deadline: null };
+      const sess = {
+        state: data.state, members: {}, online: new Map(), timer: null, deadline: null, pickLog: [],
+        room: Object.assign(newRoom(), { lastActiveAt: data.state.createdAt || Date.now() }, data.room)
+      };
+      // Older files keyed members by their raw token. Rehash them once.
+      let migrated = !data.room;
+      for (const [k, m] of Object.entries(data.members || {})) {
+        if (!m.memberId) { m.memberId = crypto.randomUUID(); migrated = true; }
+        if (isTokenHash(k)) sess.members[k] = m;
+        else { sess.members[hashToken(k)] = m; migrated = true; }
+      }
       sessions.set(sess.state.id, sess);
+      if (migrated) save(sess);
     } catch (e) {
       console.warn('[sessions] could not load', f, e.message);
     }
@@ -68,22 +116,47 @@ function loadSessions() {
 function publicView(sess) {
   return {
     state: sess.state,
-    members: Object.entries(sess.members).map(([token, m]) => ({
-      id: m.memberId || crypto.createHash('sha1').update(token).digest('hex').slice(0, 12),
-      name: m.name, teamId: m.teamId, isHost: m.isHost, online: (sess.online.get(token) || 0) > 0
-    })),
+    members: memberList(sess),
     deadline: sess.deadline,
-    serverNow: Date.now()
+    serverNow: Date.now(),
+    rev: sess.room.rev
   };
+}
+function memberList(sess) {
+  return Object.entries(sess.members).map(([key, m]) => ({
+    id: m.memberId, name: m.name, teamId: m.teamId, isHost: m.isHost, online: (sess.online.get(key) || 0) > 0
+  }));
 }
 
 let io;
-function broadcast(sess) { io.to(sess.state.id).emit('state', publicView(sess)); }
+const hasSockets = room => (io.sockets.adapter.rooms.get(room) || { size: 0 }).size > 0;
 
-function after(sess) {
+// Full state to everyone. Used for lobby, pause and undo changes.
+function broadcast(sess) { io.to(sess.state.id).to(V2(sess.state.id)).emit('state', publicView(sess)); }
+
+// Who is in the room and online. Older clients still get the full state.
+function presence(sess) {
+  const id = sess.state.id;
+  if (hasSockets(V2(id))) io.to(V2(id)).emit('presence', { rev: sess.room.rev, members: memberList(sess) });
+  if (hasSockets(id)) io.to(id).emit('state', publicView(sess));
+}
+
+// Every state change goes through here: bump rev, save, rearm the clock, notify.
+// A pick goes out as a small delta; anything else as the full state.
+function commit(sess, pick) {
+  sess.room.rev++;
+  sess.room.lastActiveAt = Date.now();
   save(sess);
   schedule(sess);
-  broadcast(sess);
+  if (!pick) return broadcast(sess);
+  const id = sess.state.id;
+  sess.pickLog.push({ rev: sess.room.rev, pick });
+  if (sess.pickLog.length > PICK_LOG) sess.pickLog.shift();
+  io.to(V2(id)).emit('draft:picked', {
+    rev: sess.room.rev, pick, deadline: sess.deadline, serverNow: Date.now(),
+    status: sess.state.status, paused: sess.state.paused
+  });
+  if (hasSockets(id)) io.to(id).emit('state', publicView(sess));
 }
 
 // Runs bots and the pick clock. The server is the only source of truth.
@@ -111,15 +184,33 @@ function autoPick(sess, by) {
   if (!id) {
     console.error(`[${s.id}] no legal player for ${oc.teamId}; pausing draft`);
     s.paused = true;
-    return after(sess);
+    return commit(sess);
   }
+  let pick = null;
   try {
-    E.makePick(s, POOL_MAP, id, { by, force: by === 'host' });
+    pick = E.makePick(s, POOL_MAP, id, { by, force: by === 'host' });
   } catch (e) {
     console.error(`[${s.id}] autopick failed:`, e.message);
   }
-  after(sess);
+  commit(sess, pick);
 }
+
+function deleteSession(sess) {
+  clearTimeout(sess.timer);
+  sessions.delete(sess.state.id);
+  try { fs.unlinkSync(path.join(SESS_DIR, sess.state.id + '.json')); } catch (e) { /* already gone */ }
+}
+
+// Hourly: drop rooms nobody has touched for 14 days.
+setInterval(() => {
+  const cutoff = Date.now() - IDLE_MS;
+  for (const sess of sessions.values()) {
+    if (sess.room.lastActiveAt < cutoff && ![...sess.online.values()].some(n => n > 0)) {
+      console.log(`[${sess.state.id}] expired after 14 idle days`);
+      deleteSession(sess);
+    }
+  }
+}, 60 * 60 * 1000).unref();
 
 // ---------- HTTP ----------
 const app = express();
@@ -136,6 +227,8 @@ app.get('/api/pool', (req, res) => res.json(POOL));
 app.get('/api/sessions/:id', (req, res) => {
   const sess = sessions.get(String(req.params.id).toUpperCase());
   if (!sess) return res.status(404).json({ error: 'Room not found' });
+  const token = req.get('X-Room-Token');
+  if (!token || !sess.members[hashToken(token)]) return res.status(403).json({ error: 'Join the room to see it' });
   res.json(publicView(sess));
 });
 app.get('/api/sessions/:id/export', (req, res) => {
@@ -149,32 +242,48 @@ const server = http.createServer(app);
 io = new Server(server, { cors: { origin: true } });
 
 // ---------- Sockets ----------
+// Behind a proxy (Render) every socket shares the proxy's address, so prefer the
+// forwarded client address. A spoofed header only dodges the limiter for that client.
+function clientIp(socket) {
+  const fwd = socket.handshake.headers['x-forwarded-for'];
+  return (fwd ? String(fwd).split(',')[0] : socket.handshake.address).trim();
+}
+
 io.on('connection', socket => {
+  const ip = clientIp(socket);
   const ctx = () => {
-    const { roomId, token } = socket.data;
+    const { roomId, key } = socket.data;
     const sess = roomId && sessions.get(roomId);
-    const member = sess && sess.members[token];
-    return { sess, member, token };
+    const member = sess && sess.members[key];
+    return { sess, member, key };
   };
   const fail = (ack, msg) => typeof ack === 'function' && ack({ ok: false, error: msg });
-  const attach = (sess, token) => {
+  const attach = (sess, key, proto) => {
     if (socket.data.roomId) detach();
     socket.data.roomId = sess.state.id;
-    socket.data.token = token;
-    socket.join(sess.state.id);
-    sess.online.set(token, (sess.online.get(token) || 0) + 1);
+    socket.data.key = key;
+    socket.join(proto === 2 ? V2(sess.state.id) : sess.state.id);
+    sess.online.set(key, (sess.online.get(key) || 0) + 1);
   };
   const detach = () => {
-    const { sess, token } = ctx();
+    const { sess, key } = ctx();
     if (!sess) return;
-    sess.online.set(token, Math.max(0, (sess.online.get(token) || 1) - 1));
+    sess.online.set(key, Math.max(0, (sess.online.get(key) || 1) - 1));
     socket.leave(sess.state.id);
+    socket.leave(V2(sess.state.id));
     socket.data.roomId = null;
-    broadcast(sess);
+    presence(sess);
   };
+  const hostAction = (ack) => {
+    const { sess, member } = ctx();
+    if (!member || !member.isHost) { fail(ack, 'Only the host can do that'); return null; }
+    return { sess, member };
+  };
+  const findMember = (sess, memberId) => Object.entries(sess.members).find(([, m]) => m.memberId === memberId);
 
   socket.on('room:create', (opts, ack) => {
     opts = opts || {};
+    if (hit('create:' + ip) > 10) return fail(ack, 'Too many rooms created. Try again in a minute.');
     const numTeams = E.clampInt(opts.numTeams, 2, 32, 12);
     const check = E.validatePool(POOL, numTeams);
     if (!check.ok) return fail(ack, 'Player pool too small: ' + check.problems.join('; '));
@@ -186,32 +295,93 @@ io.on('connection', socket => {
     const name = String(opts.name || 'Commissioner').slice(0, 32);
     E.claimTeam(state, 'T1', name);
     const token = crypto.randomUUID();
-    const sess = { state, members: { [token]: { memberId: crypto.randomUUID(), name, teamId: 'T1', isHost: true } }, online: new Map(), timer: null, deadline: null };
+    const key = hashToken(token);
+    const passcode = String(opts.passcode || '').slice(0, 64);
+    const sess = {
+      state, members: { [key]: { memberId: crypto.randomUUID(), name, teamId: 'T1', isHost: true } },
+      room: newRoom(passcode), online: new Map(), timer: null, deadline: null, pickLog: []
+    };
     sessions.set(id, sess);
-    attach(sess, token);
+    attach(sess, key, opts.proto);
     save(sess);
-    ack && ack({ ok: true, roomId: id, token, memberId: sess.members[token].memberId, view: publicView(sess) });
-    broadcast(sess);
+    ack && ack({ ok: true, roomId: id, token, memberId: sess.members[key].memberId, rev: sess.room.rev, view: publicView(sess) });
+    presence(sess);
   });
 
   socket.on('room:join', (opts, ack) => {
     opts = opts || {};
+    const failJoin = msg => { hit('join:' + ip); fail(ack, msg); };
+    if (hits('join:' + ip) >= 10) return fail(ack, 'Too many failed attempts. Try again in a minute.');
     const sess = sessions.get(String(opts.roomId || '').toUpperCase().trim());
-    if (!sess) return fail(ack, 'No room with that code');
+    if (!sess) return failJoin('No room with that code');
     let token = opts.token;
-    if (!token || !sess.members[token]) {
+    let key = token && hashToken(token);
+    if (!key || !sess.members[key]) {
+      if (sess.room.passHash && !checkPass(sess.room.passHash, opts.passcode)) {
+        return failJoin(opts.passcode ? 'Wrong passcode' : 'This room needs a passcode');
+      }
+      if (Object.keys(sess.members).length >= sess.room.maxMembers) return fail(ack, 'This room is full');
       token = crypto.randomUUID();
-      sess.members[token] = { memberId: crypto.randomUUID(), name: String(opts.name || 'Guest').slice(0, 32), teamId: null, isHost: false };
-      save(sess);
+      key = hashToken(token);
+      sess.members[key] = { memberId: crypto.randomUUID(), name: String(opts.name || 'Guest').slice(0, 32), teamId: null, isHost: false };
     }
-    attach(sess, token);
-    const m = sess.members[token];
-    if (!m.memberId) { m.memberId = crypto.randomUUID(); save(sess); }
-    ack && ack({ ok: true, roomId: sess.state.id, token, memberId: m.memberId, view: publicView(sess) });
-    broadcast(sess);
+    sess.room.lastActiveAt = Date.now();
+    save(sess);
+    attach(sess, key, opts.proto);
+    const m = sess.members[key];
+    const res = { ok: true, roomId: sess.state.id, token, memberId: m.memberId, rev: sess.room.rev };
+    // A client coming back can catch up on the picks it missed, if they are all still in the log.
+    const lastRev = opts.lastRev == null ? NaN : Number(opts.lastRev);
+    const missed = opts.proto === 2 && Number.isInteger(lastRev) ? sess.pickLog.filter(e => e.rev > lastRev) : null;
+    if (missed && lastRev <= sess.room.rev && missed.length === sess.room.rev - lastRev) {
+      Object.assign(res, { missed, members: memberList(sess), deadline: sess.deadline, serverNow: Date.now(), paused: sess.state.paused });
+    } else {
+      res.view = publicView(sess);
+    }
+    ack && ack(res);
+    presence(sess);
+  });
+
+  socket.on('room:sync', (_, ack) => {
+    const { sess, member } = ctx();
+    if (!member) return fail(ack, 'Join a room first');
+    ack && ack({ ok: true, rev: sess.room.rev, view: publicView(sess) });
   });
 
   socket.on('room:leave', (_, ack) => { detach(); ack && ack({ ok: true }); });
+
+  socket.on('member:kick', async ({ memberId } = {}, ack) => {
+    const h = hostAction(ack);
+    if (!h) return;
+    const { sess, member } = h;
+    const found = findMember(sess, memberId);
+    if (!found) return fail(ack, 'No such member');
+    const [key, target] = found;
+    if (target === member) return fail(ack, 'You cannot remove yourself');
+    if (target.teamId && sess.state.status === 'lobby') E.releaseTeam(sess.state, target.teamId);
+    delete sess.members[key];
+    sess.online.delete(key);
+    for (const s of await io.in([sess.state.id, V2(sess.state.id)]).fetchSockets()) {
+      if (s.data.key !== key) continue;
+      s.emit('room:kicked', {});
+      s.data.roomId = null;
+      s.disconnect(true);
+    }
+    commit(sess);
+    ack && ack({ ok: true });
+  });
+
+  socket.on('host:transfer', ({ memberId } = {}, ack) => {
+    const h = hostAction(ack);
+    if (!h) return;
+    const { sess, member } = h;
+    const found = findMember(sess, memberId);
+    if (!found || found[1] === member) return fail(ack, 'Pick another member');
+    member.isHost = false;
+    found[1].isHost = true;
+    commit(sess);
+    ack && ack({ ok: true });
+  });
 
   socket.on('team:claim', ({ teamId } = {}, ack) => {
     const { sess, member } = ctx();
@@ -223,7 +393,7 @@ io.on('connection', socket => {
       if (member.teamId) E.releaseTeam(sess.state, member.teamId);
       E.claimTeam(sess.state, teamId, member.name);
       member.teamId = teamId;
-      after(sess);
+      commit(sess);
       ack && ack({ ok: true });
     } catch (e) { fail(ack, e.message); }
   });
@@ -234,7 +404,7 @@ io.on('connection', socket => {
     if (sess.state.status !== 'lobby') return fail(ack, 'The draft has started');
     E.releaseTeam(sess.state, member.teamId);
     member.teamId = null;
-    after(sess);
+    commit(sess);
     ack && ack({ ok: true });
   });
 
@@ -243,7 +413,7 @@ io.on('connection', socket => {
     if (!member || !member.isHost) return fail(ack, 'Only the host can start the draft');
     try {
       E.startDraft(sess.state);
-      after(sess);
+      commit(sess);
       ack && ack({ ok: true });
     } catch (e) { fail(ack, e.message); }
   });
@@ -253,7 +423,7 @@ io.on('connection', socket => {
     if (!member || !member.teamId) return fail(ack, 'You are not drafting for a team');
     try {
       const pick = E.makePick(sess.state, POOL_MAP, playerId, { teamId: member.teamId, by: 'human' });
-      after(sess);
+      commit(sess, pick);
       ack && ack({ ok: true, pick });
     } catch (e) { fail(ack, e.message); }
   });
@@ -273,7 +443,7 @@ io.on('connection', socket => {
     if (!member || !member.isHost) return fail(ack, 'Only the host can pause');
     if (sess.state.status !== 'drafting') return fail(ack, 'The draft is not live');
     sess.state.paused = !!paused;
-    after(sess);
+    commit(sess);
     ack && ack({ ok: true });
   });
 
@@ -283,16 +453,16 @@ io.on('connection', socket => {
     try {
       E.undoLastPick(sess.state);
       sess.state.paused = true; // stop bots from instantly re-picking
-      after(sess);
+      commit(sess);
       ack && ack({ ok: true });
     } catch (e) { fail(ack, e.message); }
   });
 
   socket.on('disconnect', () => {
-    const { sess, token } = ctx();
+    const { sess, key } = ctx();
     if (!sess) return;
-    sess.online.set(token, Math.max(0, (sess.online.get(token) || 1) - 1));
-    broadcast(sess);
+    sess.online.set(key, Math.max(0, (sess.online.get(key) || 1) - 1));
+    presence(sess);
   });
 });
 
