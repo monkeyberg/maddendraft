@@ -10,8 +10,8 @@ const http = require('http');
 const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
-const E = require('./shared/draft-engine');
-const PlayerData = require('./shared/player-data');
+const E = require('./draft-engine');
+const PlayerData = require('./player-data');
 
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
@@ -124,8 +124,12 @@ function autoPick(sess, by) {
 // ---------- HTTP ----------
 const app = express();
 app.use(express.json({ limit: '1mb' }));
-app.use('/shared', express.static(path.join(__dirname, 'shared')));
-app.use(express.static(path.join(__dirname, 'public')));
+// All app files sit next to server.js. Serve only these three, so nothing else
+// in the folder (like saved sessions) is ever exposed.
+const sendFile = name => (req, res) => res.sendFile(path.join(__dirname, name));
+app.get(['/', '/index.html'], sendFile('index.html'));
+app.get('/shared/draft-engine.js', sendFile('draft-engine.js'));
+app.get('/shared/player-data.js', sendFile('player-data.js'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true, pool: POOL.length, poolSource: POOL_SOURCE, sessions: sessions.size }));
 app.get('/api/pool', (req, res) => res.json(POOL));
