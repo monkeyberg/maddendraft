@@ -1,0 +1,16 @@
+{
+  "name": "madden-startup-franchise-draft",
+  "version": "1.0.0",
+  "description": "Live 25-round snake draft for 2-32 teams building 25-man Madden franchise rosters.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build:standalone": "node scripts/build-standalone.js",
+    "test": "node scripts/simulate.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}

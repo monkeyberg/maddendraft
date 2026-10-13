@@ -1,0 +1,1641 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Madden Startup Franchise Draft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Saira+Condensed:wght@500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  if (window.tailwind) tailwind.config = {
+    theme: { extend: {
+      colors: { bg: 'var(--bg)', panel: 'var(--panel)', panel2: 'var(--panel-2)', ink: 'var(--ink)', muted: 'var(--muted)', line: 'var(--line)', navy: 'var(--navy)', gold: 'var(--gold)', off: 'var(--off)', def: 'var(--def)', bench: 'var(--bench)' },
+      fontFamily: { display: ['"Saira Condensed"', '"Arial Narrow"', 'sans-serif'], body: ['Barlow', 'system-ui', 'sans-serif'] }
+    } }
+  };
+</script>
+<style>
+  :root {
+    --bg: #e8ecf1; --panel: #ffffff; --panel-2: #f2f5f8; --ink: #17202c; --muted: #5a6677; --line: #d3dae3;
+    --navy: #14213d; --navy-ink: #f4f6fa; --gold: #f2a900; --gold-ink: #1d1500;
+    --off: #2a5bd7; --def: #c2412d; --bench: #5b6472; --ok: #1d7f47; --warn: #b45309;
+    --shadow: 0 1px 0 rgba(20, 33, 61, .08);
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101824; --panel: #172130; --panel-2: #1e2a3a; --ink: #e5eaf1; --muted: #93a0b3; --line: #2a374a;
+      --navy: #0a1322; --navy-ink: #eef2f8; --gold: #ffbf1f; --gold-ink: #1d1500;
+      --off: #79a2ff; --def: #ff8069; --bench: #a2acbb; --ok: #4cc983; --warn: #f5a524;
+      --shadow: 0 1px 0 rgba(0, 0, 0, .3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101824; --panel: #172130; --panel-2: #1e2a3a; --ink: #e5eaf1; --muted: #93a0b3; --line: #2a374a;
+    --navy: #0a1322; --navy-ink: #eef2f8; --gold: #ffbf1f; --gold-ink: #1d1500;
+    --off: #79a2ff; --def: #ff8069; --bench: #a2acbb; --ok: #4cc983; --warn: #f5a524;
+    --shadow: 0 1px 0 rgba(0, 0, 0, .3);
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  *, *::before, *::after { box-sizing: inherit; }
+  body { background: var(--bg); color: var(--ink); font-family: Barlow, system-ui, sans-serif; margin: 0; }
+  .num { font-variant-numeric: tabular-nums; }
+  :focus-visible { outline: 2px solid var(--off); outline-offset: 2px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; font-weight: 600; border-radius: 6px; padding: .5rem .9rem; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; font-size: .9rem; }
+  .btn:hover:not(:disabled) { border-color: var(--muted); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-primary { background: var(--navy); color: var(--navy-ink); border-color: var(--navy); }
+  :root[data-theme="dark"] .btn-primary { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn-primary { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); } }
+  .btn-gold { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+  .btn-sm { padding: .25rem .6rem; font-size: .8rem; }
+  .field { width: 100%; min-width: 0; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: .5rem .65rem; color: var(--ink); font: inherit; }
+  .field:focus { outline: none; border-color: var(--off); }
+  .lbl { display: block; font-weight: 600; font-size: .85rem; margin-bottom: .3rem; }
+  .hint { color: var(--muted); font-size: .8rem; }
+  input[type=range] { accent-color: var(--off); width: 100%; }
+
+  /* Broadcast ticker: the one loud element */
+  .ticker { background: var(--navy); color: var(--navy-ink); }
+  .ticker-scroll { display: flex; align-items: stretch; overflow-x: auto; scrollbar-width: thin; }
+  .tk { flex: none; padding: .45rem .8rem; border-right: 1px solid rgba(255,255,255,.08); font-size: .82rem; white-space: nowrap; line-height: 1.15; }
+  .tk .k { font-family: "Saira Condensed", sans-serif; font-weight: 700; opacity: .7; margin-right: .35rem; }
+  .tk-past { opacity: .62; }
+  .tk-now { flex: none; white-space: nowrap; background: var(--gold); color: var(--gold-ink); font-family: "Saira Condensed", sans-serif; font-size: 1.05rem; font-weight: 800; padding: .35rem 1rem; display: flex; align-items: center; gap: .6rem; }
+  .tk-round { flex: none; align-self: center; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: .75rem; color: var(--gold); padding: 0 .6rem; }
+
+  /* Position magnets */
+  .pos { display: inline-block; min-width: 2.6rem; text-align: center; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: .8rem; padding: .05rem .35rem; border-radius: 4px; color: #fff; }
+  .pos-OFF { background: var(--off); } .pos-DEF { background: var(--def); }
+  :root[data-theme="dark"] .pos { color: #0b1220; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pos { color: #0b1220; } }
+  .ovr { display: inline-block; min-width: 2.2rem; text-align: center; font-family: "Saira Condensed", sans-serif; font-weight: 800; font-size: .95rem; border-radius: 4px; padding: 0 .3rem; }
+  .ovr-elite { background: var(--gold); color: var(--gold-ink); }
+  .ovr-good { background: var(--panel-2); border: 1px solid var(--line); }
+  .ovr-mid { color: var(--ink); }
+  .ovr-low { color: var(--muted); }
+
+  .chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: .2rem .65rem; font-size: .8rem; font-weight: 600; cursor: pointer; color: var(--ink); white-space: nowrap; }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+  .chip .need { font-size: .7rem; margin-left: .25rem; color: var(--warn); }
+  .chip[aria-pressed="true"] .need { color: var(--gold); }
+
+  .pool-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  .pool-table th { position: sticky; top: 0; background: var(--panel); text-align: left; font-size: .75rem; color: var(--muted); font-weight: 600; padding: .5rem .5rem; border-bottom: 1px solid var(--line); z-index: 1; }
+  .pool-table td { padding: .4rem .5rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .pool-table tr:hover td { background: var(--panel-2); }
+  .pool-table tr.nofit td { opacity: .5; }
+
+  /* Depth chart magnets */
+  .slot { display: grid; grid-template-columns: 3.1rem 1fr auto; align-items: center; gap: .4rem; padding: .3rem .45rem; border-radius: 6px; background: var(--panel-2); border-left: 4px solid var(--bench); min-height: 2.1rem; font-size: .85rem; }
+  .slot.open { background: transparent; border: 1px dashed var(--line); border-left-width: 4px; color: var(--muted); }
+  .slot.u-OFF { border-left-color: var(--off); } .slot.u-DEF { border-left-color: var(--def); } .slot.u-BENCH { border-left-color: var(--bench); }
+  .slot .l { font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: .78rem; color: var(--muted); }
+  .slot .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .slot.open .n { font-weight: 400; font-style: italic; }
+  .slot.fresh { animation: snap .6s ease-out; }
+  @keyframes snap { from { transform: translateX(-6px); background: var(--gold); } to { transform: none; } }
+
+  .board { border-collapse: separate; border-spacing: 3px; font-size: .75rem; }
+  .board th { font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: .78rem; min-width: 7.5rem; max-width: 7.5rem; padding: .3rem; text-align: left; position: sticky; top: 0; background: var(--panel); z-index: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .board td.rd { font-family: "Saira Condensed", sans-serif; font-weight: 700; color: var(--muted); padding-right: .3rem; white-space: nowrap; position: sticky; left: 0; background: var(--panel); }
+  .bc { background: var(--panel-2); border-radius: 4px; padding: .25rem .35rem; min-height: 2.4rem; max-width: 7.5rem; border-left: 3px solid transparent; }
+  .bc.u-OFF { border-left-color: var(--off); } .bc.u-DEF { border-left-color: var(--def); }
+  .bc .bn { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bc.now { outline: 2px solid var(--gold); background: transparent; }
+  .bc.empty { background: transparent; border: 1px dashed var(--line); }
+
+  .live-dot { width: .55rem; height: .55rem; border-radius: 999px; display: inline-block; background: var(--muted); }
+  .live-dot.on { background: var(--ok); }
+  .yourpick { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(242,169,0,.0); } 50% { box-shadow: 0 0 0 6px rgba(242,169,0,.35); } }
+  @media (prefers-reduced-motion: reduce) { .yourpick, .slot.fresh { animation: none; } }
+  .toast { position: fixed; left: 50%; bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--navy); color: var(--navy-ink); padding: .6rem 1rem; border-radius: 8px; font-weight: 600; z-index: 50; max-width: 92vw; }
+  .toast.err { background: var(--def); color: #fff; }
+  .modal-bg { position: fixed; inset: 0; background: rgba(8, 14, 24, .55); z-index: 40; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  .scroll-y { overflow-y: auto; }
+  .tabbtn { font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 1.05rem; padding: .35rem .2rem; border-bottom: 3px solid transparent; color: var(--muted); background: none; cursor: pointer; }
+  .tabbtn[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--gold); }
+  .hero-h { font-family: "Saira Condensed", sans-serif; font-weight: 800; line-height: .92; letter-spacing: -.01em; font-size: clamp(2.6rem, 6vw, 4.4rem); }
+  .bar { height: 6px; background: var(--panel-2); border-radius: 99px; overflow: hidden; }
+  .bar > span { display: block; height: 100%; background: var(--gold); }
+</style>
+</head>
+<body>
+<div id="hdr"></div>
+<div id="root"></div>
+<div id="overlay"></div>
+<script>window.MSFD_STANDALONE = true;</script>
+<script>
+/*
+ * Madden Startup Franchise Draft — shared draft engine.
+ * Pure logic, no I/O. Runs in the browser (window.DraftEngine) and in Node (require).
+ * The server and the local (solo / couch) client both use this file, so the rules
+ * are identical everywhere.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.DraftEngine = factory();
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  const ROUNDS = 25;
+  const OFF = ['QB', 'RB', 'WR', 'TE', 'OT', 'OG', 'C'];
+  const DEF = ['EDGE', 'IDL', 'LB', 'CB', 'S'];
+  const ALL_POS = OFF.concat(DEF);
+  const POS_NAMES = {
+    QB: 'Quarterback', RB: 'Running back', WR: 'Wide receiver', TE: 'Tight end',
+    OT: 'Offensive tackle', OG: 'Guard', C: 'Center', EDGE: 'Edge rusher',
+    IDL: 'Interior D-line', LB: 'Linebacker', CB: 'Cornerback', S: 'Safety'
+  };
+
+  // Raw position labels (Madden / NFL style) -> roster group.
+  const POS_ALIASES = {
+    QB: 'QB', HB: 'RB', RB: 'RB', FB: 'RB', WR: 'WR', TE: 'TE',
+    LT: 'OT', RT: 'OT', OT: 'OT', T: 'OT', LG: 'OG', RG: 'OG', OG: 'OG', G: 'OG', IOL: 'OG', C: 'C',
+    DE: 'EDGE', LE: 'EDGE', RE: 'EDGE', EDGE: 'EDGE', LEDG: 'EDGE', REDG: 'EDGE',
+    DT: 'IDL', IDL: 'IDL', NT: 'IDL', DL: 'IDL',
+    MLB: 'LB', ILB: 'LB', OLB: 'LB', LOLB: 'LB', ROLB: 'LB', SAM: 'LB', WILL: 'LB', MIKE: 'LB', LB: 'LB',
+    CB: 'CB', NB: 'CB', FS: 'S', SS: 'S', S: 'S', DB: 'S'
+  };
+
+  function slot(key, label, pos, unit, pref) {
+    return { key, label, unit, accepts: [pos], pref: pref || null, flex: false };
+  }
+
+  // The 25-man template. Order matters: it is the display order of the depth chart.
+  const SLOTS = [
+    slot('QB', 'QB', 'QB', 'OFF'),
+    slot('RB', 'HB', 'RB', 'OFF'),
+    slot('WR1', 'WR1', 'WR', 'OFF'), slot('WR2', 'WR2', 'WR', 'OFF'), slot('WR3', 'WR3', 'WR', 'OFF'),
+    slot('TE1', 'TE1', 'TE', 'OFF'), slot('TE2', 'TE2', 'TE', 'OFF'),
+    slot('LT', 'LT', 'OT', 'OFF', 'LT'), slot('RT', 'RT', 'OT', 'OFF', 'RT'),
+    slot('LG', 'LG', 'OG', 'OFF', 'LG'), slot('RG', 'RG', 'OG', 'OFF', 'RG'),
+    slot('C', 'C', 'C', 'OFF'),
+    slot('LEDG', 'LEDG', 'EDGE', 'DEF', 'LE'), slot('REDG', 'REDG', 'EDGE', 'DEF', 'RE'),
+    slot('DT1', 'DT1', 'IDL', 'DEF'), slot('DT2', 'DT2', 'IDL', 'DEF'),
+    slot('MLB', 'MLB', 'LB', 'DEF', 'MLB'), slot('OLB', 'OLB', 'LB', 'DEF', 'OLB'),
+    slot('CB1', 'CB1', 'CB', 'DEF'), slot('CB2', 'CB2', 'CB', 'DEF'), slot('CB3', 'CB3', 'CB', 'DEF'),
+    slot('FS', 'FS', 'S', 'DEF', 'FS'), slot('SS', 'SS', 'S', 'DEF', 'SS'),
+    { key: 'OFLEX', label: 'Off. backup', unit: 'BENCH', accepts: OFF.slice(), pref: null, flex: true, side: 'OFF' },
+    { key: 'DFLEX', label: 'Def. backup', unit: 'BENCH', accepts: DEF.slice(), pref: null, flex: true, side: 'DEF' }
+  ];
+  if (SLOTS.length !== ROUNDS) throw new Error('Slot template must have exactly 25 slots');
+
+  // Required dedicated (starter) count per position group.
+  const REQUIRED = {};
+  ALL_POS.forEach(p => { REQUIRED[p] = 0; });
+  SLOTS.forEach(s => { if (!s.flex) REQUIRED[s.accepts[0]]++; });
+
+  const STRATEGIES = {
+    balanced: { label: 'Balanced', jitter: 2, need: 0.6, premium: { QB: 3, EDGE: 2, WR: 1, OT: 1, CB: 1, RB: 0, TE: 0, IDL: 0.5, LB: -1, S: -1, OG: -1, C: -2 } },
+    bpa: { label: 'Best available', jitter: 1, need: 0, premium: {} },
+    trenches: { label: 'Trenches first', jitter: 2, need: 0.4, premium: { QB: 2, OT: 3, OG: 2, C: 1, EDGE: 3, IDL: 3, RB: -2, WR: -1, TE: -1, LB: -1, CB: -1, S: -2 } },
+    skill: { label: 'Skill and speed', jitter: 2, need: 0.4, premium: { QB: 4, WR: 3, RB: 2, TE: 2, CB: 1, S: 0, OT: -1, OG: -3, C: -3, EDGE: 0, IDL: -2, LB: -1 } },
+    needs: { label: 'Needs-based', jitter: 1.5, need: 2, premium: { QB: 2, EDGE: 1, WR: 1, OT: 1, CB: 1 } }
+  };
+  const BOT_STRATS = ['balanced', 'bpa', 'trenches', 'skill', 'needs'];
+  const ADP_PREMIUM = STRATEGIES.balanced.premium;
+
+  const BOT_TEAMS = [
+    'Albuquerque Roadrunners', 'Birmingham Ironclads', 'Boise Blizzard', 'Charleston Tidecallers',
+    'El Paso Outlaws', 'Hartford Harbormasters', 'Honolulu Breakers', 'Louisville Thoroughbreds',
+    'Oklahoma City Twisters', 'Omaha Stockmen', 'Orlando Comets', 'Portland Lumberjacks',
+    'Sacramento Gold', 'Salt Lake Summit', 'San Antonio Vaqueros', 'San Diego Surf',
+    'St. Louis Archers', 'Toronto Northmen', 'Mexico City Aztecs', 'London Knights',
+    'Austin Armadillos', 'Columbus Foundry', 'Raleigh Oaks', 'Richmond Riverhawks',
+    'Anchorage Aurora', 'Spokane Sentinels', 'Tulsa Wildcatters', 'Milwaukee Brewmasters',
+    'Norfolk Navigators', 'Reno Highrollers', 'Montreal Voyageurs', 'Fresno Firebirds'
+  ];
+
+  // ---------- Seedable PRNG (cyrb128-style hash -> mulberry32) ----------
+  function hashSeed(str) {
+    let h = 1779033703 ^ str.length;
+    for (let i = 0; i < str.length; i++) {
+      h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+      h = (h << 13) | (h >>> 19);
+    }
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return (h ^= h >>> 16) >>> 0;
+  }
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function createRng(seed) { return mulberry32(hashSeed(String(seed))); }
+  function shuffle(arr, rng) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function randomSeed() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let s = '';
+    for (let i = 0; i < 8; i++) {
+      if (i === 4) s += '-';
+      s += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return s;
+  }
+
+  // ---------- Helpers ----------
+  function err(msg, code) { const e = new Error(msg); e.code = code || 'RULE'; return e; }
+  function clampInt(v, lo, hi, dflt) {
+    const n = parseInt(v, 10);
+    if (Number.isNaN(n)) return dflt;
+    return Math.max(lo, Math.min(hi, n));
+  }
+  function getTeam(state, teamId) { return state.teams.find(t => t.id === teamId) || null; }
+
+  // ---------- Player pool ----------
+  function normalizePool(raw, opts) {
+    if (!Array.isArray(raw)) throw err('Player pool must be a JSON array of players', 'POOL');
+    const rng = createRng((opts && opts.seed) || 'adp');
+    const out = [];
+    const seen = new Set();
+    raw.forEach((r, i) => {
+      if (!r || !r.name || !r.pos) return;
+      const detail = String(r.pos).toUpperCase().trim();
+      const pos = POS_ALIASES[detail];
+      if (!pos) return; // skip K, P, LS, etc.
+      let id = r.id != null ? String(r.id) : 'P' + String(i + 1).padStart(4, '0');
+      while (seen.has(id)) id += 'x';
+      seen.add(id);
+      const ovr = clampInt(r.ovr != null ? r.ovr : r.overall, 40, 99, 60);
+      out.push({
+        id, name: String(r.name).trim(), team: String(r.team || 'FA').toUpperCase().slice(0, 4),
+        pos, detail, ovr, adp: r.adp != null ? Number(r.adp) : null
+      });
+    });
+    if (out.some(p => p.adp == null || Number.isNaN(p.adp))) computeAdp(out, rng);
+    out.sort((a, b) => a.adp - b.adp);
+    return out;
+  }
+  function computeAdp(pool, rng) {
+    const scored = pool.map(p => ({ p, v: p.ovr + (ADP_PREMIUM[p.pos] || 0) + (rng() - 0.5) * 3 }));
+    scored.sort((a, b) => b.v - a.v);
+    scored.forEach((s, i) => { s.p.adp = i + 1; });
+    return pool;
+  }
+  function indexPool(pool) {
+    const map = Object.create(null);
+    pool.forEach(p => { map[p.id] = p; });
+    return map;
+  }
+  // Checks that a pool can complete a draft for numTeams teams.
+  function validatePool(pool, numTeams) {
+    const counts = {};
+    ALL_POS.forEach(p => { counts[p] = 0; });
+    pool.forEach(p => { counts[p.pos]++; });
+    const problems = [];
+    ALL_POS.forEach(p => {
+      const need = REQUIRED[p] * numTeams;
+      if (counts[p] < need) problems.push(`${POS_NAMES[p]}: ${counts[p]} in pool, need at least ${need}`);
+    });
+    const offNeed = OFF.reduce((s, p) => s + REQUIRED[p], 0) * numTeams + numTeams;
+    const defNeed = DEF.reduce((s, p) => s + REQUIRED[p], 0) * numTeams + numTeams;
+    const offHave = OFF.reduce((s, p) => s + counts[p], 0);
+    const defHave = DEF.reduce((s, p) => s + counts[p], 0);
+    if (offHave < offNeed) problems.push(`Offense: ${offHave} players, need ${offNeed}`);
+    if (defHave < defNeed) problems.push(`Defense: ${defHave} players, need ${defNeed}`);
+    return { ok: problems.length === 0, problems, counts };
+  }
+
+  // ---------- Session lifecycle ----------
+  function createSession(opts) {
+    opts = opts || {};
+    const n = clampInt(opts.numTeams, 2, 32, 12);
+    const humans = clampInt(opts.humanSlots, 0, n, 1);
+    const names = opts.humanNames || [];
+    const teams = [];
+    for (let i = 0; i < n; i++) {
+      const human = i < humans;
+      teams.push({
+        id: 'T' + (i + 1),
+        name: human ? (names[i] || '') : BOT_TEAMS[i % BOT_TEAMS.length],
+        isBot: !human,
+        claimed: human ? !!names[i] : true,
+        strategy: human ? null : BOT_STRATS[i % BOT_STRATS.length],
+        slots: new Array(SLOTS.length).fill(null)
+      });
+    }
+    return {
+      version: 1,
+      id: opts.id || null,
+      seed: String(opts.seed || randomSeed()),
+      createdAt: Date.now(),
+      status: 'lobby',
+      paused: false,
+      config: {
+        numTeams: n, humanSlots: humans, rounds: ROUNDS,
+        pickTimer: clampInt(opts.pickTimer, 0, 600, 0),
+        botDelayMs: clampInt(opts.botDelayMs, 0, 10000, 700)
+      },
+      teams, order: [], picks: [], drafted: {}, currentPick: 0
+    };
+  }
+
+  function claimTeam(state, teamId, name) {
+    if (state.status !== 'lobby') throw err('Teams can only be claimed before the draft starts');
+    const t = getTeam(state, teamId);
+    if (!t || t.isBot) throw err('That team slot is not open to humans');
+    t.name = String(name || 'Drafter').slice(0, 32);
+    t.claimed = true;
+    return t;
+  }
+  function releaseTeam(state, teamId) {
+    const t = getTeam(state, teamId);
+    if (t && !t.isBot && state.status === 'lobby') { t.claimed = false; t.name = ''; }
+  }
+
+  // Randomizes the round-1 order from the seed and opens the draft.
+  function startDraft(state) {
+    if (state.status !== 'lobby') throw err('Draft already started');
+    let b = 0;
+    state.teams.forEach(t => {
+      if (!t.isBot && !t.claimed) {
+        t.isBot = true;
+        t.claimed = true;
+        t.name = BOT_TEAMS[(state.teams.length + b) % BOT_TEAMS.length] + ' (auto)';
+        t.strategy = BOT_STRATS[b % BOT_STRATS.length];
+        b++;
+      }
+    });
+    const rng = createRng(state.seed + '|order');
+    state.order = shuffle(state.teams.map(t => t.id), rng);
+    state.status = 'drafting';
+    state.startedAt = Date.now();
+    state.currentPick = 0;
+    return state;
+  }
+
+  // Snake order: odd rounds go 1 -> N, even rounds go N -> 1.
+  function pickInfo(state, overallIndex) {
+    const n = state.teams.length;
+    const round = Math.floor(overallIndex / n) + 1;
+    const i = overallIndex % n;
+    const pos = round % 2 === 1 ? i : n - 1 - i;
+    return { overall: overallIndex + 1, round, pickInRound: i + 1, teamId: state.order[pos] };
+  }
+  function totalPicks(state) { return state.teams.length * ROUNDS; }
+  function onClock(state) {
+    if (state.status !== 'drafting') return null;
+    return pickInfo(state, state.currentPick);
+  }
+  function upcoming(state, count) {
+    const out = [];
+    const end = Math.min(totalPicks(state), state.currentPick + count);
+    for (let i = state.currentPick; i < end; i++) out.push(pickInfo(state, i));
+    return out;
+  }
+
+  // ---------- Roster constraints ----------
+  // Returns the slot index this player would fill for the team, or -1 if illegal.
+  // Order: dedicated slot matching the player's listed spot (LT -> LT), any dedicated
+  // slot for the group, then the side's bench/flex slot.
+  function findSlotIndex(team, player) {
+    let firstDedicated = -1;
+    for (let i = 0; i < SLOTS.length; i++) {
+      const s = SLOTS[i];
+      if (team.slots[i] || s.flex || s.accepts[0] !== player.pos) continue;
+      if (s.pref && s.pref === player.detail) return i;
+      if (firstDedicated < 0) firstDedicated = i;
+    }
+    if (firstDedicated >= 0) return firstDedicated;
+    for (let i = 0; i < SLOTS.length; i++) {
+      const s = SLOTS[i];
+      if (!team.slots[i] && s.flex && s.accepts.indexOf(player.pos) >= 0) return i;
+    }
+    return -1;
+  }
+  function canDraft(team, player) { return findSlotIndex(team, player) >= 0; }
+  function openNeeds(team) {
+    const needs = {};
+    ALL_POS.forEach(p => { needs[p] = 0; });
+    SLOTS.forEach((s, i) => { if (!s.flex && !team.slots[i]) needs[s.accepts[0]]++; });
+    return needs;
+  }
+  function openFlex(team) {
+    return SLOTS.filter((s, i) => s.flex && !team.slots[i]).map(s => s.side);
+  }
+  function filledCount(team) { return team.slots.filter(Boolean).length; }
+
+  // ---------- Picks ----------
+  function makePick(state, poolMap, playerId, meta) {
+    meta = meta || {};
+    if (state.status !== 'drafting') throw err('The draft is not live');
+    if (state.paused && !meta.force) throw err('The draft is paused');
+    const info = onClock(state);
+    if (meta.teamId && meta.teamId !== info.teamId) throw err('It is not your pick');
+    const player = poolMap[playerId];
+    if (!player) throw err('Unknown player');
+    if (state.drafted[playerId]) throw err(player.name + ' is already drafted');
+    const team = getTeam(state, info.teamId);
+    const si = findSlotIndex(team, player);
+    if (si < 0) throw err('No open roster slot for a ' + POS_NAMES[player.pos].toLowerCase());
+    team.slots[si] = playerId;
+    state.drafted[playerId] = team.id;
+    const pick = {
+      overall: info.overall, round: info.round, pickInRound: info.pickInRound,
+      teamId: team.id, playerId, slot: SLOTS[si].key, by: meta.by || 'human', ts: Date.now()
+    };
+    state.picks.push(pick);
+    state.currentPick++;
+    if (state.currentPick >= totalPicks(state)) {
+      state.status = 'complete';
+      state.completedAt = Date.now();
+    }
+    return pick;
+  }
+  function undoLastPick(state) {
+    const pick = state.picks.pop();
+    if (!pick) throw err('No picks to undo');
+    const team = getTeam(state, pick.teamId);
+    const si = team.slots.indexOf(pick.playerId);
+    if (si >= 0) team.slots[si] = null;
+    delete state.drafted[pick.playerId];
+    state.currentPick--;
+    state.status = 'drafting';
+    delete state.completedAt;
+    return pick;
+  }
+
+  // Bot / auto-pick brain. Deterministic for a given seed + pick number.
+  function botChoose(state, pool, poolMap, teamId, opts) {
+    opts = opts || {};
+    const team = getTeam(state, teamId);
+    if (!team) return null;
+    if (opts.queue) {
+      for (const id of opts.queue) {
+        const p = poolMap[id];
+        if (p && !state.drafted[id] && canDraft(team, p)) return id;
+      }
+    }
+    const strat = STRATEGIES[opts.strategy || team.strategy] || STRATEGIES.balanced;
+    const rng = createRng(state.seed + '|pick|' + state.currentPick + '|' + teamId);
+    const roundsLeft = ROUNDS - filledCount(team);
+    const needs = openNeeds(team);
+    let best = null;
+    let bestScore = -Infinity;
+    for (const p of pool) {
+      if (state.drafted[p.id]) continue;
+      const si = findSlotIndex(team, p);
+      if (si < 0) continue;
+      let s = p.ovr + (strat.premium[p.pos] || 0);
+      if (SLOTS[si].flex) s -= 4 + roundsLeft * 0.5;
+      s += strat.need * (needs[p.pos] || 0);
+      s += (rng() * 2 - 1) * strat.jitter;
+      s -= p.adp * 0.0005;
+      if (s > bestScore) { bestScore = s; best = p; }
+    }
+    return best ? best.id : null;
+  }
+
+  // ---------- Reporting ----------
+  function teamSummary(state, poolMap, teamId) {
+    const team = getTeam(state, teamId);
+    const sum = { OFF: [0, 0], DEF: [0, 0], ALL: [0, 0] };
+    SLOTS.forEach((s, i) => {
+      const p = team.slots[i] && poolMap[team.slots[i]];
+      if (!p || s.flex) return;
+      sum[s.unit][0] += p.ovr; sum[s.unit][1]++;
+      sum.ALL[0] += p.ovr; sum.ALL[1]++;
+    });
+    const avg = a => (a[1] ? Math.round((a[0] / a[1]) * 10) / 10 : null);
+    return { teamId, filled: filledCount(team), off: avg(sum.OFF), def: avg(sum.DEF), starters: avg(sum.ALL) };
+  }
+  function leagueTable(state, poolMap) {
+    const rows = state.teams.map(t => Object.assign({ name: t.name, isBot: t.isBot }, teamSummary(state, poolMap, t.id)));
+    rows.sort((a, b) => (b.starters || 0) - (a.starters || 0));
+    const n = rows.length;
+    const grades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D'];
+    rows.forEach((r, i) => {
+      r.rank = i + 1;
+      r.grade = grades[Math.min(grades.length - 1, Math.floor((i / n) * grades.length))];
+    });
+    return rows;
+  }
+  function exportResults(state, poolMap) {
+    const name = id => (getTeam(state, id) || {}).name;
+    return {
+      app: 'Madden Startup Franchise Draft',
+      seed: state.seed,
+      config: state.config,
+      status: state.status,
+      draftOrder: state.order.map((id, i) => ({ slot: i + 1, teamId: id, team: name(id) })),
+      picks: state.picks.map(pk => {
+        const p = poolMap[pk.playerId] || {};
+        return { overall: pk.overall, round: pk.round, pick: pk.pickInRound, team: name(pk.teamId), player: p.name, pos: p.detail, nflTeam: p.team, ovr: p.ovr, slot: pk.slot, by: pk.by };
+      }),
+      rosters: state.teams.map(t => ({
+        team: t.name, bot: t.isBot,
+        roster: SLOTS.map((s, i) => {
+          const p = t.slots[i] && poolMap[t.slots[i]];
+          return { slot: s.key, unit: s.unit, player: p ? p.name : null, pos: p ? p.detail : null, ovr: p ? p.ovr : null };
+        })
+      })),
+      standings: leagueTable(state, poolMap)
+    };
+  }
+
+  return {
+    ROUNDS, OFF, DEF, ALL_POS, POS_NAMES, POS_ALIASES, SLOTS, REQUIRED, STRATEGIES, BOT_TEAMS,
+    createRng, shuffle, randomSeed, hashSeed, clampInt, getTeam,
+    normalizePool, computeAdp, indexPool, validatePool,
+    createSession, claimTeam, releaseTeam, startDraft,
+    pickInfo, totalPicks, onClock, upcoming,
+    findSlotIndex, canDraft, openNeeds, openFlex, filledCount,
+    makePick, undoLastPick, botChoose,
+    teamSummary, leagueTable, exportResults
+  };
+});
+
+</script>
+<script>
+/*
+ * Built-in player pool.
+ * - Stars: real NFL players. Ratings are rough approximations, NOT official Madden
+ *   ratings, and teams reflect the 2025 season. Swap in your own data via data/players.json.
+ * - Depth: procedurally generated fictional players so 32 teams can fill 25 slots.
+ * The pool is deterministic (fixed seed), so every client and the server see the same ids.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./draft-engine'));
+  else root.MaddenPlayerData = factory(root.DraftEngine);
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (E) {
+  'use strict';
+
+  const NFL_TEAMS = ['ARI', 'ATL', 'BAL', 'BUF', 'CAR', 'CHI', 'CIN', 'CLE', 'DAL', 'DEN', 'DET', 'GB',
+    'HOU', 'IND', 'JAX', 'KC', 'LV', 'LAC', 'LAR', 'MIA', 'MIN', 'NE', 'NO', 'NYG', 'NYJ', 'PHI',
+    'PIT', 'SF', 'SEA', 'TB', 'TEN', 'WAS'];
+
+  // name|team|pos|ovr
+  const STARS = `Josh Allen|BUF|QB|96
+Lamar Jackson|BAL|QB|96
+Patrick Mahomes|KC|QB|95
+Joe Burrow|CIN|QB|93
+Jared Goff|DET|QB|89
+Jalen Hurts|PHI|QB|89
+Jayden Daniels|WAS|QB|88
+Baker Mayfield|TB|QB|88
+Justin Herbert|LAC|QB|87
+Matthew Stafford|LAR|QB|87
+Brock Purdy|SF|QB|86
+Dak Prescott|DAL|QB|85
+Jordan Love|GB|QB|85
+C.J. Stroud|HOU|QB|84
+Saquon Barkley|PHI|HB|97
+Derrick Henry|BAL|HB|95
+Bijan Robinson|ATL|HB|94
+Jahmyr Gibbs|DET|HB|93
+Christian McCaffrey|SF|HB|92
+Jonathan Taylor|IND|HB|90
+Josh Jacobs|GB|HB|90
+De'Von Achane|MIA|HB|88
+Kyren Williams|LAR|HB|85
+Ashton Jeanty|LV|HB|82
+Ja'Marr Chase|CIN|WR|98
+Justin Jefferson|MIN|WR|98
+CeeDee Lamb|DAL|WR|96
+Amon-Ra St. Brown|DET|WR|95
+Puka Nacua|LAR|WR|94
+A.J. Brown|PHI|WR|93
+Nico Collins|HOU|WR|92
+Jaxon Smith-Njigba|SEA|WR|92
+Malik Nabers|NYG|WR|91
+Drake London|ATL|WR|90
+Garrett Wilson|NYJ|WR|89
+Davante Adams|LAR|WR|89
+Mike Evans|TB|WR|89
+Terry McLaurin|WAS|WR|89
+Brian Thomas Jr.|JAX|WR|88
+Tee Higgins|CIN|WR|88
+DK Metcalf|PIT|WR|87
+George Kittle|SF|TE|96
+Trey McBride|ARI|TE|93
+Brock Bowers|LV|TE|92
+Mark Andrews|BAL|TE|88
+Sam LaPorta|DET|TE|87
+T.J. Hockenson|MIN|TE|85
+Dalton Kincaid|BUF|TE|82
+Penei Sewell|DET|RT|97
+Trent Williams|SF|LT|96
+Tristan Wirfs|TB|LT|95
+Lane Johnson|PHI|RT|94
+Jordan Mailata|PHI|LT|94
+Rashawn Slater|LAC|LT|92
+Christian Darrisaw|MIN|LT|90
+Kolton Miller|LV|LT|90
+Laremy Tunsil|WAS|LT|89
+Garett Bolles|DEN|LT|88
+Joe Thuney|CHI|LG|95
+Quinn Meinerz|DEN|RG|94
+Chris Lindstrom|ATL|RG|94
+Landon Dickerson|PHI|LG|92
+Tyler Smith|DAL|LG|92
+Quenton Nelson|IND|LG|92
+Trey Smith|KC|RG|91
+Kevin Zeitler|TEN|RG|88
+Creed Humphrey|KC|C|96
+Tyler Linderbaum|BAL|C|92
+Drew Dalman|CHI|C|88
+Cam Jurgens|PHI|C|88
+Erik McCoy|NO|C|87
+Myles Garrett|CLE|RE|99
+Micah Parsons|GB|LE|97
+T.J. Watt|PIT|LE|96
+Maxx Crosby|LV|RE|96
+Nick Bosa|SF|RE|94
+Aidan Hutchinson|DET|LE|93
+Danielle Hunter|HOU|RE|93
+Trey Hendrickson|CIN|RE|92
+Will Anderson Jr.|HOU|LE|92
+Brian Burns|NYG|LE|90
+Josh Hines-Allen|JAX|RE|90
+Jared Verse|LAR|LE|89
+Abdul Carter|NYG|RE|80
+Chris Jones|KC|DT|96
+Dexter Lawrence|NYG|DT|96
+Jalen Carter|PHI|DT|93
+Jeffery Simmons|TEN|DT|93
+Quinnen Williams|DAL|DT|92
+Zach Allen|DEN|DT|91
+Cameron Heyward|PIT|DT|90
+Leonard Williams|SEA|DT|90
+Vita Vea|TB|DT|89
+Nnamdi Madubuike|BAL|DT|88
+Fred Warner|SF|MLB|97
+Roquan Smith|BAL|MLB|94
+Zack Baun|PHI|OLB|91
+Jack Campbell|DET|MLB|91
+Bobby Wagner|WAS|MLB|88
+Foyesade Oluokun|JAX|MLB|87
+Patrick Queen|PIT|MLB|86
+Nick Bolton|KC|MLB|85
+Patrick Surtain II|DEN|CB|97
+Derek Stingley Jr.|HOU|CB|95
+Sauce Gardner|IND|CB|93
+Trent McDuffie|KC|CB|93
+Christian Gonzalez|NE|CB|92
+Jaycee Horn|CAR|CB|91
+Quinyon Mitchell|PHI|CB|90
+Denzel Ward|CLE|CB|90
+Devon Witherspoon|SEA|CB|89
+Marlon Humphrey|BAL|CB|88
+Jalen Ramsey|PIT|CB|88
+Kyle Hamilton|BAL|SS|96
+Derwin James Jr.|LAC|SS|94
+Kerby Joseph|DET|FS|93
+Xavier McKinney|GB|FS|92
+Antoine Winfield Jr.|TB|SS|91
+Jessie Bates III|ATL|FS|90
+Brian Branch|DET|SS|89
+Budda Baker|ARI|SS|89
+Minkah Fitzpatrick|MIA|FS|88`;
+
+  const FIRST = ['Marcus', 'Devin', 'Tre', 'Jalen', 'Cole', 'Isaiah', 'Brandon', 'Xavier', 'Darius', 'Trevor',
+    'Malik', 'Caleb', 'Jordan', 'Andre', 'Tyrell', 'Garrett', 'Keon', 'Rashad', 'Elijah', 'Bryce',
+    'Dominic', 'Quentin', 'Lamont', 'Hunter', 'Cedric', 'Mason', 'Terrance', 'Logan', 'Jaylen', 'Desmond',
+    'Wyatt', 'Kendrick', 'Ty', 'Nolan', 'Reggie', 'Damon', 'Colby', 'Javon', 'Austin', 'Micah',
+    'Grant', 'Zion', 'Shane', 'Derrick', 'Corey', 'Emmanuel', 'Luke', 'Omar', 'Tavion', 'Brody'];
+  const LAST = ['Whitfield', 'Okafor', 'Brennan', 'Castillo', 'Holloway', 'Pruitt', 'Vance', 'Mercer', 'Dunlap', 'Sutton',
+    'Ashford', 'Granger', 'Kincaid', 'Rivers', 'Lyle', 'McAllister', 'Booker', 'Tate', 'Hargrove', 'Ellison',
+    'Fontenot', 'Barksdale', 'Crowder', 'Pemberton', 'Strickland', 'Odom', 'Bridges', 'Calloway', 'Hensley', 'Mabry',
+    'Quarles', 'Rutledge', 'Stallworth', 'Talbert', 'Underwood', 'Vickers', 'Wardlaw', 'Yancey', 'Zeller', 'Akins',
+    'Boudreaux', 'Coleman', 'Delacroix', 'Easley', 'Fairley', 'Gaines', 'Hollins', 'Iverson', 'Jessup', 'Kearse',
+    'Lockett', 'Murrell', 'Nwosu', 'Ogletree', 'Pickens', 'Ransom', 'Sowell', 'Toliver', 'Upshaw', 'Wilburn'];
+
+  // Total pool size per position group (stars included). Sized so 32 teams can
+  // always finish, even if every team uses its backup slot on the same position.
+  const TARGETS = { QB: 72, RB: 92, WR: 200, TE: 112, OT: 112, OG: 112, C: 72, EDGE: 112, IDL: 112, LB: 112, CB: 160, S: 112 };
+  const DETAIL_CYCLE = { QB: ['QB'], RB: ['HB'], WR: ['WR'], TE: ['TE'], OT: ['LT', 'RT'], OG: ['LG', 'RG'], C: ['C'],
+    EDGE: ['LE', 'RE'], IDL: ['DT'], LB: ['MLB', 'OLB', 'OLB'], CB: ['CB'], S: ['FS', 'SS'] };
+
+  function buildRaw(seed) {
+    const rng = E.createRng(seed || 'madden-pool-v1');
+    const raw = [];
+    const names = new Set();
+    const groupCount = {};
+    E.ALL_POS.forEach(p => { groupCount[p] = 0; });
+
+    STARS.trim().split('\n').forEach(line => {
+      const [name, team, pos, ovr] = line.split('|');
+      names.add(name);
+      groupCount[E.POS_ALIASES[pos]]++;
+      raw.push({ name, team, pos, ovr: Number(ovr) });
+    });
+
+    E.ALL_POS.forEach(group => {
+      const n = Math.max(0, TARGETS[group] - groupCount[group]);
+      const cycle = DETAIL_CYCLE[group];
+      for (let i = 0; i < n; i++) {
+        let name;
+        do {
+          name = FIRST[Math.floor(rng() * FIRST.length)] + ' ' + LAST[Math.floor(rng() * LAST.length)];
+        } while (names.has(name));
+        names.add(name);
+        const curve = 85 - 27 * Math.pow(i / n, 0.8);
+        const ovr = Math.round(Math.max(55, Math.min(86, curve + (rng() - 0.5) * 4)));
+        raw.push({ name, team: NFL_TEAMS[Math.floor(rng() * NFL_TEAMS.length)], pos: cycle[i % cycle.length], ovr });
+      }
+    });
+    return raw;
+  }
+
+  function buildPool(seed) {
+    return E.normalizePool(buildRaw(seed), { seed: (seed || 'madden-pool-v1') + '|adp' });
+  }
+
+  return { NFL_TEAMS, buildPool, buildRaw, STAR_COUNT: STARS.trim().split('\n').length };
+});
+
+</script>
+<script>
+(() => {
+'use strict';
+const E = window.DraftEngine;
+const PD = window.MaddenPlayerData;
+const $ = (s, el) => (el || document).querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const LS = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage full or blocked */ } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } }
+};
+const LOCAL_KEY = 'msfd:local:v1';
+const ONLINE_KEY = 'msfd:online:v1';
+const UNIT = {};
+E.OFF.forEach(p => { UNIT[p] = 'OFF'; });
+E.DEF.forEach(p => { UNIT[p] = 'DEF'; });
+
+const app = {
+  screen: 'setup', mode: null, state: null,
+  pool: [], poolMap: {}, poolSource: 'built-in', customPool: null,
+  myTeams: [], viewTeam: null, tab: 'pool',
+  filters: { q: '', pos: 'ALL', team: 'ALL', sort: 'adp', fit: true }, limit: 150,
+  serverAvailable: false, serverPool: null, socket: null, connected: false,
+  room: null, token: null, memberId: null, members: [], isHost: false,
+  deadline: null, botTimer: null, tick: null, lastOnClock: null, freshSlot: null,
+  setupTab: 'local',
+  setup: { numTeams: 12, humans: 1, names: ['My Franchise'], seed: E.randomSeed(), pickTimer: 0, botDelay: 500, onlineName: '', joinCode: '', onlineHumans: 4 }
+};
+
+// ---------- Utilities ----------
+function setPool(pool, source) { app.pool = pool; app.poolMap = E.indexPool(pool); app.poolSource = source; }
+function team(id) { return app.state ? E.getTeam(app.state, id) : null; }
+function player(id) { return app.poolMap[id]; }
+function ovrClass(o) { return o >= 90 ? 'ovr-elite' : o >= 80 ? 'ovr-good' : o >= 70 ? 'ovr-mid' : 'ovr-low'; }
+function posTag(p) { return `<span class="pos pos-${UNIT[p.pos]}">${esc(p.detail)}</span>`; }
+function shortName(n) { const parts = n.split(' '); return parts.length > 1 ? parts[0][0] + '. ' + parts.slice(1).join(' ') : n; }
+function ordinal(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+function fmt(v) { return v == null ? '–' : Number(v).toFixed(1); }
+function teamLabel(t) { return t ? (t.isBot ? '🤖 ' : '') + t.name : ''; }
+let toastTimer = null;
+function toast(msg, kind) {
+  let el = $('#toast');
+  if (!el) { el = document.createElement('div'); el.id = 'toast'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+  el.className = 'toast' + (kind === 'err' ? ' err' : '');
+  el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
+}
+function isMine(teamId) { return app.myTeams.indexOf(teamId) >= 0; }
+function onClock() { return app.state ? E.onClock(app.state) : null; }
+// The team whose needs drive the pool view and the Draft buttons.
+function draftingFor() {
+  const oc = onClock();
+  if (oc && isMine(oc.teamId)) return team(oc.teamId);
+  return app.myTeams.length ? team(app.myTeams[0]) : null;
+}
+function canActNow() {
+  const oc = onClock();
+  return !!(oc && !app.state.paused && isMine(oc.teamId));
+}
+
+// ---------- Theme ----------
+function applyTheme(t) {
+  if (t) document.documentElement.setAttribute('data-theme', t);
+  else document.documentElement.removeAttribute('data-theme');
+}
+applyTheme(LS.get('msfd:theme'));
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') ||
+    (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  applyTheme(next); LS.set('msfd:theme', next);
+}
+
+// ---------- Header ----------
+function renderHeader() {
+  const s = app.state;
+  let right = '';
+  if (app.mode === 'online' && app.room) {
+    right += `<span class="flex items-center gap-1.5 text-sm"><span class="live-dot ${app.connected ? 'on' : ''}"></span>${app.connected ? 'Live' : 'Reconnecting'}</span>
+      <span class="text-sm">Room <b class="font-display text-base tracking-wide">${esc(app.room)}</b></span>`;
+  } else if (app.mode === 'local') {
+    right += `<span class="text-sm text-muted hidden sm:inline">Solo / couch draft</span>`;
+  }
+  if (s && app.screen !== 'setup') right += `<span class="text-sm text-muted hidden sm:inline">Seed <b class="text-ink">${esc(s.seed)}</b></span>`;
+  $('#hdr').innerHTML = `
+  <header class="border-b border-line bg-panel">
+    <div class="max-w-[1500px] mx-auto px-4 py-2.5 flex items-center gap-4">
+      <div class="flex items-baseline gap-2 min-w-0">
+        <span class="font-display font-extrabold text-xl sm:text-2xl leading-none">Startup Franchise Draft</span>
+        <span class="text-muted text-sm hidden md:inline">25 rounds, snake order</span>
+      </div>
+      <div class="ml-auto flex items-center gap-3">${right}
+        <button class="btn btn-sm" data-action="theme" aria-label="Switch light or dark theme">◐</button>
+      </div>
+    </div>
+  </header>`;
+}
+
+// ---------- Setup screen ----------
+function templatePreview() {
+  const groups = [['OFF', 'Offense, 12'], ['DEF', 'Defense, 11'], ['BENCH', 'Backups, 2']];
+  return groups.map(([u, title]) => `
+    <div>
+      <div class="font-display font-bold text-lg mb-1.5">${title}</div>
+      <div class="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+        ${E.SLOTS.filter(s => s.unit === u).map(s => `<div class="slot u-${u} open !grid-cols-1 !min-h-0 py-1"><span class="l">${esc(s.label)}</span></div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function renderSetup() {
+  const st = app.setup;
+  const saved = LS.get(LOCAL_KEY);
+  const savedInfo = saved && saved.state && saved.state.status !== 'lobby'
+    ? (saved.state.status === 'complete' ? 'Finished draft' : `Round ${E.pickInfo(saved.state, saved.state.currentPick).round}, pick ${saved.state.currentPick + 1} overall`) : null;
+  const names = [];
+  for (let i = 0; i < st.humans; i++) {
+    names.push(`<input class="field" data-name-idx="${i}" maxlength="32" value="${esc(st.names[i] || '')}" placeholder="Drafter ${i + 1} team name" aria-label="Drafter ${i + 1} team name">`);
+  }
+  const timerOpts = [[0, 'No clock'], [30, '30 seconds'], [60, '60 seconds'], [90, '90 seconds'], [120, '2 minutes']];
+  const speedOpts = [[80, 'Instant'], [500, 'Fast'], [1200, 'Normal'], [2500, 'Slow']];
+  const opt = (list, val) => list.map(([v, l]) => `<option value="${v}" ${Number(val) === v ? 'selected' : ''}>${l}</option>`).join('');
+  const poolLine = app.customPool
+    ? `Custom pool loaded: <b>${app.customPool.length}</b> players. <button class="underline" data-action="clear-pool">Use built-in pool</button>`
+    : `Built-in pool: <b>${(app.serverPool || app.pool).length}</b> players.`;
+
+  const localForm = `
+    <div class="space-y-4">
+      <div>
+        <label class="lbl" for="numTeams">Teams in the draft: <span id="numTeamsVal" class="num">${st.numTeams}</span></label>
+        <input id="numTeams" type="range" min="2" max="32" value="${st.numTeams}" data-bind="numTeams">
+      </div>
+      <div>
+        <label class="lbl" for="humans">Human drafters</label>
+        <input id="humans" class="field w-28" type="number" min="0" max="${st.numTeams}" value="${st.humans}" data-bind="humans">
+        <p class="hint mt-1">Bots fill the other ${Math.max(0, st.numTeams - st.humans)} teams. Set 0 to watch an all-bot mock. More than one human means you pass the device.</p>
+      </div>
+      ${st.humans ? `<div><span class="lbl">Team names</span><div class="grid sm:grid-cols-2 gap-2 max-h-48 scroll-y pr-1">${names.join('')}</div></div>` : ''}
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div><label class="lbl" for="pickTimer">Pick clock</label><select id="pickTimer" class="field" data-bind="pickTimer">${opt(timerOpts, st.pickTimer)}</select></div>
+        <div><label class="lbl" for="botDelay">Bot speed</label><select id="botDelay" class="field" data-bind="botDelay">${opt(speedOpts, st.botDelay)}</select></div>
+      </div>
+      <div>
+        <label class="lbl" for="seed">Draft order seed</label>
+        <div class="flex gap-2"><input id="seed" class="field" data-bind="seed" value="${esc(st.seed)}" maxlength="40"><button class="btn" data-action="dice" aria-label="New random seed">🎲</button></div>
+        <p class="hint mt-1">Same seed and settings give the same draft order and the same bot picks.</p>
+      </div>
+      <div class="text-sm">
+        <p>${poolLine}</p>
+        <label class="btn btn-sm mt-2 cursor-pointer">Load player JSON<input type="file" accept=".json,application/json" class="hidden" data-action="pool-file"></label>
+        <p class="hint mt-1">Array of {name, team, pos, ovr, adp?}. Positions like QB, HB, LT, RG, DE, DT, MLB, CB, FS work.</p>
+      </div>
+      <div class="flex flex-wrap gap-2 pt-1">
+        <button class="btn btn-primary" data-action="start-local">Start draft</button>
+        ${savedInfo ? `<button class="btn" data-action="resume-local">Resume saved draft (${esc(savedInfo)})</button><button class="btn btn-sm" data-action="discard-local">Discard save</button>` : ''}
+      </div>
+    </div>`;
+
+  const onlineForm = app.serverAvailable ? `
+    <div class="space-y-6">
+      <div class="space-y-3">
+        <div class="font-display font-bold text-lg">Create a room</div>
+        <div><label class="lbl" for="oname">Your name</label><input id="oname" class="field" data-bind="onlineName" maxlength="32" value="${esc(st.onlineName)}" placeholder="Commissioner"></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="lbl" for="onumTeams">Teams</label><input id="onumTeams" type="number" min="2" max="32" class="field" data-bind="numTeams" value="${st.numTeams}"></div>
+          <div><label class="lbl" for="ohumans">Human seats</label><input id="ohumans" type="number" min="1" max="${st.numTeams}" class="field" data-bind="onlineHumans" value="${st.onlineHumans}"></div>
+          <div><label class="lbl" for="otimer">Pick clock</label><select id="otimer" class="field" data-bind="pickTimer">${opt(timerOpts, st.pickTimer)}</select></div>
+          <div><label class="lbl" for="obot">Bot speed</label><select id="obot" class="field" data-bind="botDelay">${opt(speedOpts, st.botDelay)}</select></div>
+        </div>
+        <div><label class="lbl" for="oseed">Seed</label><div class="flex gap-2"><input id="oseed" class="field" data-bind="seed" value="${esc(st.seed)}"><button class="btn" data-action="dice" aria-label="New random seed">🎲</button></div></div>
+        <p class="hint">Open human seats that nobody claims become bots when you start.</p>
+        <button class="btn btn-primary" data-action="create-room">Create room</button>
+      </div>
+      <div class="space-y-3 border-t border-line pt-5">
+        <div class="font-display font-bold text-lg">Join a room</div>
+        <div class="grid grid-cols-[1fr_8rem] gap-2">
+          <input class="field" data-bind="onlineName" value="${esc(st.onlineName)}" placeholder="Your name" aria-label="Your name" maxlength="32">
+          <input class="field uppercase tracking-widest" data-bind="joinCode" value="${esc(st.joinCode)}" placeholder="CODE" aria-label="Room code" maxlength="5">
+        </div>
+        <button class="btn" data-action="join-room">Join room</button>
+      </div>
+    </div>` : `
+    <div class="space-y-3 text-sm">
+      <p>Online rooms need the Node server, which runs the live picks for everyone.</p>
+      <pre class="bg-panel2 border border-line rounded-md p-3 overflow-x-auto text-xs">npm install
+npm start
+# then open http://localhost:3000</pre>
+      <p class="hint">Friends on your network can join at http://YOUR-IP:3000 with the room code.</p>
+    </div>`;
+
+  $('#root').innerHTML = `
+  <main class="max-w-6xl mx-auto px-4 py-8 lg:py-12 grid lg:grid-cols-[1.05fr_1fr] gap-8 lg:gap-12 items-start">
+    <section>
+      <h1 class="hero-h">Twenty-five picks.<br>One franchise.</h1>
+      <p class="mt-4 text-muted max-w-xl">Draft against friends or bots in a snake draft. Each roster must fill the same 25 spots, and the draft stops you from taking a player you have no room for.</p>
+      <div class="card p-4 mt-6 space-y-4">${templatePreview()}</div>
+    </section>
+    <section class="card p-5">
+      <div class="flex gap-5 border-b border-line mb-5" role="tablist">
+        <button class="tabbtn" role="tab" aria-selected="${app.setupTab === 'local'}" data-action="setup-tab" data-tab="local">Solo or couch</button>
+        <button class="tabbtn" role="tab" aria-selected="${app.setupTab === 'online'}" data-action="setup-tab" data-tab="online">Online room</button>
+      </div>
+      ${app.setupTab === 'local' ? localForm : onlineForm}
+    </section>
+  </main>`;
+}
+
+// ---------- Local (solo / couch) mode ----------
+function startLocal() {
+  const st = app.setup;
+  const pool = app.customPool || app.serverPool || PD.buildPool();
+  const check = E.validatePool(pool, st.numTeams);
+  if (!check.ok) { toast('Pool too small: ' + check.problems[0], 'err'); return; }
+  setPool(pool, app.customPool ? 'custom' : 'built-in');
+  const names = [];
+  for (let i = 0; i < st.humans; i++) names.push((st.names[i] || '').trim() || (st.humans === 1 ? 'My Franchise' : 'Drafter ' + (i + 1)));
+  const state = E.createSession({ numTeams: st.numTeams, humanSlots: st.humans, humanNames: names, seed: st.seed.trim() || E.randomSeed(), pickTimer: st.pickTimer, botDelayMs: st.botDelay });
+  E.startDraft(state);
+  enterLocal(state);
+}
+function enterLocal(state) {
+  app.mode = 'local';
+  app.state = state;
+  app.myTeams = state.teams.filter(t => !t.isBot).map(t => t.id);
+  app.viewTeam = app.myTeams[0] || state.order[0];
+  app.screen = 'draft';
+  render();
+  scheduleLocal();
+  saveLocal();
+}
+function saveLocal() {
+  LS.set(LOCAL_KEY, { state: app.state, poolSource: app.poolSource, customPool: app.poolSource === 'custom' ? app.pool : null });
+}
+function resumeLocal() {
+  const saved = LS.get(LOCAL_KEY);
+  if (!saved || !saved.state) return;
+  setPool(saved.customPool || app.serverPool || PD.buildPool(), saved.customPool ? 'custom' : 'built-in');
+  enterLocal(saved.state);
+}
+function scheduleLocal() {
+  clearTimeout(app.botTimer);
+  app.deadline = null;
+  const s = app.state;
+  if (!s || s.status !== 'drafting' || s.paused) return;
+  const oc = E.onClock(s);
+  const t = team(oc.teamId);
+  if (t.isBot) app.botTimer = setTimeout(() => localAuto('bot'), s.config.botDelayMs);
+  else if (s.config.pickTimer > 0) {
+    app.deadline = Date.now() + s.config.pickTimer * 1000;
+    app.botTimer = setTimeout(() => localAuto('timer'), s.config.pickTimer * 1000);
+  }
+}
+function localAuto(by) {
+  const s = app.state;
+  if (!s || s.status !== 'drafting') return;
+  const oc = E.onClock(s);
+  const id = E.botChoose(s, app.pool, app.poolMap, oc.teamId);
+  if (!id) { s.paused = true; toast('No legal player is left for this team. The draft is paused.', 'err'); return afterLocal(); }
+  const pick = E.makePick(s, app.poolMap, id, { by, force: true });
+  if (by === 'timer' || by === 'auto') toast(`Auto-picked ${player(id).name} for ${team(oc.teamId).name}`);
+  markFresh(pick);
+  afterLocal();
+}
+function afterLocal() { saveLocal(); updateDraft(); scheduleLocal(); }
+
+// ---------- Online mode ----------
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+async function detectServer() {
+  if (window.MSFD_STANDALONE || !/^https?:$/.test(location.protocol)) return false;
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 1500);
+    const r = await fetch('/api/health', { signal: ctl.signal });
+    clearTimeout(timer);
+    if (!r.ok) return false;
+    const j = await r.json();
+    if (!j.ok) return false;
+    await loadScript('/socket.io/socket.io.js');
+    const pool = await (await fetch('/api/pool')).json();
+    app.serverPool = pool;
+    setPool(pool, 'server');
+    return typeof window.io === 'function';
+  } catch (e) { return false; }
+}
+function connectSocket() {
+  if (app.socket) return app.socket;
+  const sock = window.io({ transports: ['websocket', 'polling'] });
+  app.socket = sock;
+  sock.on('connect', () => {
+    app.connected = true;
+    if (app.room && app.token) {
+      sock.emit('room:join', { roomId: app.room, token: app.token }, res => {
+        if (!res.ok) { toast(res.error, 'err'); leaveOnline(); return; }
+        app.memberId = res.memberId;
+        onView(res.view);
+      });
+    }
+    renderHeader();
+  });
+  sock.on('disconnect', () => { app.connected = false; renderHeader(); });
+  sock.on('state', onView);
+  return sock;
+}
+function emit(evt, payload) {
+  return new Promise(resolve => {
+    app.socket.emit(evt, payload || {}, res => {
+      if (res && !res.ok) toast(res.error, 'err');
+      resolve(res || { ok: false });
+    });
+  });
+}
+function enterRoom(res) {
+  app.mode = 'online';
+  app.room = res.roomId; app.token = res.token; app.memberId = res.memberId;
+  LS.set(ONLINE_KEY, { room: app.room, token: app.token });
+  const u = new URL(location.href); u.searchParams.set('room', app.room); history.replaceState(null, '', u);
+  onView(res.view);
+}
+async function createRoom() {
+  const st = app.setup;
+  connectSocket();
+  const res = await emit('room:create', { name: st.onlineName || 'Commissioner', numTeams: st.numTeams, humanSlots: st.onlineHumans, seed: st.seed, pickTimer: st.pickTimer, botDelayMs: st.botDelay });
+  if (res.ok) enterRoom(res);
+}
+async function joinRoom() {
+  const st = app.setup;
+  if (!st.joinCode) return toast('Enter the room code', 'err');
+  connectSocket();
+  const res = await emit('room:join', { roomId: st.joinCode, name: st.onlineName || 'Guest' });
+  if (res.ok) enterRoom(res);
+}
+function leaveOnline() {
+  if (app.socket) app.socket.emit('room:leave', {});
+  LS.del(ONLINE_KEY);
+  app.mode = null; app.room = null; app.token = null; app.state = null; app.myTeams = [];
+  const u = new URL(location.href); u.searchParams.delete('room'); history.replaceState(null, '', u);
+  app.screen = 'setup';
+  render();
+}
+function onView(view) {
+  const prevCount = app.state ? app.state.picks.length : 0;
+  app.state = view.state;
+  app.members = view.members;
+  const offset = view.serverNow - Date.now();
+  app.deadline = view.deadline ? view.deadline - offset : null;
+  const me = view.members.find(m => m.id === app.memberId);
+  app.isHost = !!(me && me.isHost);
+  app.myTeams = me && me.teamId ? [me.teamId] : [];
+  if (!app.viewTeam || !team(app.viewTeam)) app.viewTeam = app.myTeams[0] || 'T1';
+  if (app.state.picks.length > prevCount) markFresh(app.state.picks[app.state.picks.length - 1]);
+  const next = app.state.status === 'lobby' ? 'lobby' : 'draft';
+  if (app.screen !== next || next === 'lobby') { app.screen = next; render(); }
+  else updateDraft();
+}
+
+// ---------- Lobby ----------
+function renderLobby() {
+  const s = app.state;
+  const byTeam = {};
+  app.members.forEach(m => { if (m.teamId) byTeam[m.teamId] = m; });
+  const link = location.origin + location.pathname + '?room=' + app.room;
+  const rows = s.teams.map(t => {
+    const m = byTeam[t.id];
+    let right;
+    if (t.isBot) right = `<span class="text-muted text-sm">Bot, ${esc(E.STRATEGIES[t.strategy].label.toLowerCase())}</span>`;
+    else if (m) right = `<span class="flex items-center gap-1.5 text-sm"><span class="live-dot ${m.online ? 'on' : ''}"></span>${m.id === app.memberId ? 'You' : esc(m.name)}${m.isHost ? ' (host)' : ''}</span>`;
+    else right = `<button class="btn btn-sm" data-action="claim" data-team="${t.id}">Take this seat</button>`;
+    return `<div class="flex items-center justify-between gap-3 py-2 border-b border-line">
+      <span class="font-semibold">${t.isBot ? '🤖 ' + esc(t.name) : (t.claimed ? esc(t.name) : '<span class="text-muted">Open human seat</span>')}</span>${right}</div>`;
+  }).join('');
+  const spectators = app.members.filter(m => !m.teamId);
+  $('#root').innerHTML = `
+  <main class="max-w-4xl mx-auto px-4 py-8 space-y-6">
+    <section class="card p-5 flex flex-wrap items-center gap-6">
+      <div>
+        <div class="text-muted text-sm">Room code</div>
+        <div class="font-display font-extrabold text-5xl tracking-widest">${esc(app.room)}</div>
+      </div>
+      <div class="flex-1 min-w-[16rem] text-sm space-y-2">
+        <p>Share this link. Friends pick an open seat, then the host starts the draft.</p>
+        <input class="field text-xs" readonly value="${esc(link)}" aria-label="Room link">
+        <p class="hint">${s.config.numTeams} teams, ${s.config.pickTimer ? s.config.pickTimer + '-second clock' : 'no pick clock'}, seed ${esc(s.seed)}.</p>
+      </div>
+    </section>
+    <section class="card p-5">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="font-display font-bold text-2xl">Teams</h2>
+        <div class="flex gap-2">
+          ${app.myTeams.length && !app.isHost ? `<button class="btn btn-sm" data-action="release">Give up my seat</button>` : ''}
+          <button class="btn btn-sm" data-action="leave">Leave room</button>
+          ${app.isHost ? `<button class="btn btn-primary" data-action="start-online">Start draft</button>` : ''}
+        </div>
+      </div>
+      ${!app.isHost ? `<p class="hint mb-2">Waiting for the host to start. The draft order is drawn from the seed at the start.</p>` : `<p class="hint mb-2">Open seats become bots when you start.</p>`}
+      <div class="grid md:grid-cols-2 gap-x-8">${rows}</div>
+      ${spectators.length ? `<p class="hint mt-3">Watching: ${spectators.map(m => esc(m.name)).join(', ')}</p>` : ''}
+    </section>
+  </main>`;
+}
+
+// ---------- Draft room ----------
+function renderDraftShell() {
+  const teamsOpts = ['ALL'].concat(Array.from(new Set(app.pool.map(p => p.team))).sort());
+  $('#root').innerHTML = `
+  <div class="ticker"><div class="ticker-scroll" id="ticker" aria-label="Draft ticker"></div></div>
+  <main class="max-w-[1500px] mx-auto px-3 sm:px-4 py-4 grid gap-4 lg:grid-cols-[17rem_minmax(0,1fr)_21rem] items-start">
+    <aside class="space-y-4 lg:sticky lg:top-3">
+      <section class="card p-4" id="clock"></section>
+      <section class="card p-4 hidden lg:block">
+        <h2 class="font-display font-bold text-lg mb-2">Latest picks</h2>
+        <ol id="recent" class="space-y-1.5 text-sm max-h-[40vh] scroll-y"></ol>
+      </section>
+    </aside>
+    <section class="card min-w-0">
+      <div id="complete"></div>
+      <div class="flex gap-5 px-4 pt-2 border-b border-line" role="tablist">
+        <button class="tabbtn" role="tab" data-action="tab" data-tab="pool" id="tab-pool">Player pool</button>
+        <button class="tabbtn" role="tab" data-action="tab" data-tab="board" id="tab-board">Draft board</button>
+      </div>
+      <div id="pane-pool">
+        <div class="p-3 space-y-2.5 border-b border-line">
+          <div class="flex flex-wrap gap-2">
+            <input class="field flex-1" style="width:auto;min-width:12rem" type="search" placeholder="Search by player, team, or position" data-filter="q" value="${esc(app.filters.q)}" aria-label="Search players">
+            <select class="field" style="width:auto" data-filter="team" aria-label="NFL team">${teamsOpts.map(t => `<option value="${t}" ${app.filters.team === t ? 'selected' : ''}>${t === 'ALL' ? 'All NFL teams' : t}</option>`).join('')}</select>
+            <select class="field" style="width:auto" data-filter="sort" aria-label="Sort">
+              <option value="adp" ${app.filters.sort === 'adp' ? 'selected' : ''}>Sort by ADP</option>
+              <option value="ovr" ${app.filters.sort === 'ovr' ? 'selected' : ''}>Sort by rating</option>
+              <option value="name" ${app.filters.sort === 'name' ? 'selected' : ''}>Sort by name</option>
+            </select>
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5" id="pos-chips"></div>
+        </div>
+        <div class="overflow-auto max-h-[calc(100vh-15rem)] min-h-[20rem]" id="pool-wrap">
+          <table class="pool-table">
+            <thead><tr><th class="w-12">ADP</th><th>Player</th><th class="w-14">Pos</th><th class="w-14 hidden sm:table-cell">Team</th><th class="w-14">OVR</th><th class="w-24 text-right"></th></tr></thead>
+            <tbody id="pool-body"></tbody>
+          </table>
+          <div id="pool-foot" class="p-3 text-center text-sm text-muted"></div>
+        </div>
+      </div>
+      <div id="pane-board" hidden><div class="overflow-auto max-h-[calc(100vh-11rem)] p-3" id="board"></div></div>
+    </section>
+    <aside class="card p-4 lg:sticky lg:top-3" id="roster"></aside>
+  </main>`;
+  setTab(app.tab, true);
+}
+
+function setTab(tab, silent) {
+  app.tab = tab;
+  $('#tab-pool').setAttribute('aria-selected', tab === 'pool');
+  $('#tab-board').setAttribute('aria-selected', tab === 'board');
+  $('#pane-pool').hidden = tab !== 'pool';
+  $('#pane-board').hidden = tab !== 'board';
+  if (!silent) updateDraft();
+}
+
+function updateDraft() {
+  if (app.screen !== 'draft' || !$('#ticker')) return;
+  renderTicker(); renderClock(); renderRecent(); renderChips(); renderPool(); renderRoster(); renderComplete();
+  if (app.tab === 'board') renderBoard();
+  renderHeader();
+  const oc = onClock();
+  const key = oc ? oc.overall : null;
+  if (key !== app.lastOnClock) {
+    app.lastOnClock = key;
+    if (oc && isMine(oc.teamId) && !app.state.paused) {
+      if (app.myTeams.length > 1) app.viewTeam = oc.teamId;
+      document.title = '⏱ Your pick | Startup Franchise Draft';
+      renderRoster();
+    } else document.title = 'Madden Startup Franchise Draft';
+  }
+}
+
+function renderTicker() {
+  const s = app.state;
+  const parts = [];
+  s.picks.slice(-6).forEach(pk => {
+    const p = player(pk.playerId); const t = team(pk.teamId);
+    parts.push(`<div class="tk tk-past"><span class="k">#${pk.overall}</span>${esc(t.name)}<br><b>${esc(shortName(p.name))}</b> ${esc(p.detail)}</div>`);
+  });
+  const oc = onClock();
+  if (oc) {
+    parts.push(`<div class="tk-now" id="tk-now"><span>On the clock</span><span>${esc(team(oc.teamId).name)}</span><span class="num opacity-80">R${oc.round} P${oc.pickInRound}</span><span class="num" data-timer></span></div>`);
+    let lastRound = oc.round;
+    E.upcoming(s, 14).slice(1).forEach(u => {
+      if (u.round !== lastRound) { parts.push(`<div class="tk-round">Round ${u.round} turns</div>`); lastRound = u.round; }
+      const t = team(u.teamId);
+      parts.push(`<div class="tk ${isMine(u.teamId) ? 'font-bold' : ''}"><span class="k">#${u.overall}</span>${isMine(u.teamId) ? '★ ' : ''}${esc(t.name)}</div>`);
+    });
+  } else if (s.status === 'complete') {
+    parts.push(`<div class="tk-now">Draft complete</div>`);
+  }
+  const el = $('#ticker');
+  el.innerHTML = parts.join('');
+  const now = $('#tk-now');
+  if (now) el.scrollLeft = Math.max(0, now.offsetLeft - Math.min(220, el.clientWidth * 0.15));
+}
+
+function renderClock() {
+  const s = app.state;
+  const oc = onClock();
+  const total = E.totalPicks(s);
+  const done = s.picks.length;
+  let body;
+  if (!oc) {
+    body = `<div class="font-display font-extrabold text-3xl">Draft complete</div><p class="text-sm text-muted mt-1">${total} players drafted.</p>`;
+  } else {
+    const t = team(oc.teamId);
+    const mine = isMine(oc.teamId);
+    const owner = app.mode === 'online' ? app.members.find(m => m.teamId === oc.teamId) : null;
+    let status;
+    if (s.paused) status = `<span class="font-semibold" style="color:var(--warn)">Paused</span>`;
+    else if (mine) status = `<span class="inline-block btn-gold rounded px-2 py-0.5 font-bold yourpick">Your pick${app.myTeams.length > 1 ? ': ' + esc(t.name) : ''}</span>`;
+    else if (t.isBot) status = `<span class="text-muted">Bot is picking</span>`;
+    else status = `<span class="text-muted">Waiting on ${esc(owner ? owner.name : t.name)}${owner && !owner.online ? ' (offline)' : ''}</span>`;
+    const canControl = app.mode === 'local' || app.isHost;
+    const buttons = [];
+    if (canControl) buttons.push(`<button class="btn btn-sm" data-action="pause">${s.paused ? 'Resume' : 'Pause'}</button>`);
+    if (mine || (app.mode === 'online' && app.isHost && !t.isBot)) buttons.push(`<button class="btn btn-sm" data-action="autopick" ${s.paused && app.mode === 'online' ? 'disabled' : ''}>Auto-pick</button>`);
+    if (canControl && done > 0) buttons.push(`<button class="btn btn-sm" data-action="undo">Undo last pick</button>`);
+    body = `
+      <div class="text-sm text-muted">On the clock</div>
+      <div class="font-display font-extrabold text-[1.7rem] leading-tight mt-0.5">${esc(teamLabel(t))}</div>
+      <div class="text-sm mt-1">Round ${oc.round}, pick ${oc.pickInRound} <span class="text-muted">(${ordinal(oc.overall)} overall)</span></div>
+      <div class="mt-2">${status}</div>
+      <div class="mt-3" data-timer-wrap ${app.deadline ? '' : 'hidden'}><div class="flex justify-between text-sm mb-1"><span>Time left</span><b class="num" data-timer></b></div><div class="bar"><span data-timer-bar style="width:100%"></span></div></div>
+      ${buttons.length ? `<div class="flex flex-wrap gap-1.5 mt-3">${buttons.join('')}</div>` : ''}`;
+  }
+  const leave = app.mode === 'online' ? `<button class="btn btn-sm" data-action="leave">Leave room</button>` : `<button class="btn btn-sm" data-action="new-draft">New draft</button>`;
+  $('#clock').innerHTML = `${body}
+    <div class="mt-4 pt-3 border-t border-line">
+      <div class="flex justify-between text-xs text-muted mb-1"><span>Pick ${Math.min(done + 1, total)} of ${total}</span><span>${Math.round(done / total * 100)}%</span></div>
+      <div class="bar"><span style="width:${done / total * 100}%"></span></div>
+      <div class="mt-3 flex gap-1.5 flex-wrap">${leave}<button class="btn btn-sm" data-action="export">Export results</button></div>
+    </div>`;
+  renderTimer();
+}
+
+function renderTimer() {
+  const els = document.querySelectorAll('[data-timer]');
+  const wrap = $('[data-timer-wrap]');
+  const bar = $('[data-timer-bar]');
+  if (!app.deadline || !app.state || app.state.status !== 'drafting' || app.state.paused) {
+    els.forEach(e => { e.textContent = ''; });
+    if (wrap) wrap.hidden = true;
+    return;
+  }
+  const left = Math.max(0, app.deadline - Date.now());
+  const secs = Math.ceil(left / 1000);
+  const txt = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+  els.forEach(e => { e.textContent = txt; });
+  if (wrap) wrap.hidden = false;
+  if (bar) bar.style.width = (left / (app.state.config.pickTimer * 1000) * 100) + '%';
+}
+
+function renderRecent() {
+  const s = app.state;
+  const list = s.picks.slice(-30).reverse();
+  $('#recent').innerHTML = list.length ? list.map(pk => {
+    const p = player(pk.playerId); const t = team(pk.teamId);
+    return `<li class="flex gap-2 items-start ${isMine(pk.teamId) ? 'font-semibold' : ''}">
+      <span class="num text-muted w-8 shrink-0 text-right">${pk.overall}</span>
+      <span class="min-w-0"><span class="block truncate">${esc(p.name)} ${posTag(p)}</span><span class="block text-xs text-muted truncate">${esc(t.name)}${pk.by !== 'human' && pk.by !== 'bot' ? ', auto-pick' : ''}</span></span></li>`;
+  }).join('') : `<li class="text-muted">No picks yet. ${isMine((onClock() || {}).teamId) ? 'You are up first.' : ''}</li>`;
+}
+
+function renderChips() {
+  const t = draftingFor();
+  const needs = t ? E.openNeeds(t) : null;
+  const flex = t ? E.openFlex(t) : [];
+  const chips = ['ALL'].concat(E.ALL_POS).map(p => {
+    let need = '';
+    if (needs && p !== 'ALL') {
+      const n = needs[p];
+      if (n) need = `<span class="need">${n}</span>`;
+    }
+    return `<button class="chip" aria-pressed="${app.filters.pos === p}" data-action="pos" data-pos="${p}" title="${p === 'ALL' ? 'All positions' : E.POS_NAMES[p]}">${p === 'ALL' ? 'All' : p}${need}</button>`;
+  }).join('');
+  const fit = t && app.state.status === 'drafting' ? `<label class="ml-auto flex items-center gap-1.5 text-sm cursor-pointer"><input type="checkbox" data-filter="fit" ${app.filters.fit ? 'checked' : ''}> Only players ${esc(t.name)} can roster</label>` : '';
+  const flexNote = t && flex.length ? `<span class="hint">Backup spots open: ${flex.map(f => f === 'OFF' ? 'offense' : 'defense').join(', ')}</span>` : '';
+  $('#pos-chips').innerHTML = chips + flexNote + fit;
+}
+
+function filteredPool() {
+  const f = app.filters;
+  const q = f.q.trim().toLowerCase();
+  const t = draftingFor();
+  const drafted = app.state.drafted;
+  let list = app.pool.filter(p => !drafted[p.id]);
+  if (f.pos !== 'ALL') list = list.filter(p => p.pos === f.pos);
+  if (f.team !== 'ALL') list = list.filter(p => p.team === f.team);
+  if (q) list = list.filter(p => p.name.toLowerCase().indexOf(q) >= 0 || p.team.toLowerCase() === q || p.detail.toLowerCase() === q || p.pos.toLowerCase() === q);
+  if (f.fit && t && app.state.status === 'drafting') list = list.filter(p => E.canDraft(t, p));
+  if (f.sort === 'ovr') list.sort((a, b) => b.ovr - a.ovr || a.adp - b.adp);
+  else if (f.sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
+  else list.sort((a, b) => a.adp - b.adp);
+  return list;
+}
+
+function renderPool() {
+  const list = filteredPool();
+  const t = draftingFor();
+  const act = canActNow();
+  const shown = list.slice(0, app.limit);
+  $('#pool-body').innerHTML = shown.length ? shown.map(p => {
+    const fits = t ? E.canDraft(t, p) : true;
+    let btn = '';
+    if (app.state.status === 'drafting' && t) {
+      if (!fits) btn = `<span class="text-xs text-muted">No spot</span>`;
+      else btn = `<button class="btn btn-sm ${act ? 'btn-primary' : ''}" data-action="draft" data-id="${esc(p.id)}" ${act ? '' : 'disabled'} aria-label="Draft ${esc(p.name)}">Draft</button>`;
+    }
+    return `<tr class="${fits ? '' : 'nofit'}">
+      <td class="num text-muted">${p.adp}</td>
+      <td><div class="font-semibold leading-tight">${esc(p.name)}</div><div class="text-xs text-muted sm:hidden">${esc(p.team)}</div></td>
+      <td>${posTag(p)}</td>
+      <td class="hidden sm:table-cell text-muted">${esc(p.team)}</td>
+      <td><span class="ovr ${ovrClass(p.ovr)}">${p.ovr}</span></td>
+      <td class="text-right">${btn}</td></tr>`;
+  }).join('') : `<tr><td colspan="6" class="text-center py-8 text-muted">No players match. Clear the search or pick another position.</td></tr>`;
+  $('#pool-foot').innerHTML = list.length > shown.length
+    ? `Showing ${shown.length} of ${list.length}. <button class="underline" data-action="more">Show 150 more</button>`
+    : `${list.length} player${list.length === 1 ? '' : 's'}`;
+}
+
+function renderRoster() {
+  const s = app.state;
+  if (!team(app.viewTeam)) app.viewTeam = s.order[0] || s.teams[0].id;
+  const t = team(app.viewTeam);
+  const sum = E.teamSummary(s, app.poolMap, t.id);
+  const freshKey = app.freshSlot && app.freshSlot.teamId === t.id ? app.freshSlot.slot : null;
+  const tile = (sl, i) => {
+    const p = t.slots[i] && player(t.slots[i]);
+    if (!p) return `<div class="slot u-${sl.unit} open"><span class="l">${esc(sl.label)}</span><span class="n">${sl.flex ? (sl.side === 'OFF' ? 'QB, RB, WR, TE, OL' : 'DL, LB, DB') : 'Open'}</span><span></span></div>`;
+    return `<div class="slot u-${sl.unit} ${freshKey === sl.key ? 'fresh' : ''}" title="${esc(p.name)}, ${esc(p.detail)}, ${esc(p.team)}"><span class="l">${esc(sl.label)}</span><span class="n">${esc(p.name)}</span><span class="ovr ${ovrClass(p.ovr)}">${p.ovr}</span></div>`;
+  };
+  const unit = (u, title) => {
+    const idx = E.SLOTS.map((sl, i) => [sl, i]).filter(([sl]) => sl.unit === u);
+    const filled = idx.filter(([, i]) => t.slots[i]).length;
+    return `<div class="mt-4"><div class="flex justify-between items-baseline mb-1.5"><h3 class="font-display font-bold text-lg">${title}</h3><span class="text-xs text-muted num">${filled} of ${idx.length}</span></div>
+      <div class="grid grid-cols-1 gap-1">${idx.map(([sl, i]) => tile(sl, i)).join('')}</div></div>`;
+  };
+  const opts = s.teams.map(x => `<option value="${x.id}" ${x.id === t.id ? 'selected' : ''}>${isMine(x.id) ? '★ ' : ''}${esc(teamLabel(x))}</option>`).join('');
+  const stat = (label, v) => `<div><div class="text-xs text-muted">${label}</div><div class="font-display font-extrabold text-xl num">${v == null ? '–' : (typeof v === 'number' ? v.toFixed(1) : v)}</div></div>`;
+  $('#roster').innerHTML = `
+    <label class="lbl" for="viewTeam">Depth chart</label>
+    <select id="viewTeam" class="field" data-action="view-team">${opts}</select>
+    <div class="grid grid-cols-4 gap-2 mt-3">${stat('Filled', sum.filled + '/25')}${stat('Starters', sum.starters)}${stat('Offense', sum.off)}${stat('Defense', sum.def)}</div>
+    <div class="bar mt-2"><span style="width:${sum.filled / 25 * 100}%"></span></div>
+    <div class="max-h-[calc(100vh-15rem)] scroll-y pr-1 -mr-1">
+      ${unit('OFF', 'Offense')}${unit('DEF', 'Defense')}${unit('BENCH', 'Backups')}
+    </div>
+    ${t.isBot ? `<p class="hint mt-3">Bot style: ${esc(E.STRATEGIES[t.strategy].label.toLowerCase())}.</p>` : ''}`;
+}
+
+function renderBoard() {
+  const s = app.state;
+  const n = s.teams.length;
+  const byOverall = {};
+  s.picks.forEach(pk => { byOverall[pk.overall] = pk; });
+  const head = s.order.map((id, i) => `<th title="${esc(team(id).name)}" class="${isMine(id) ? 'text-off' : ''}">${i + 1}. ${esc(team(id).name)}</th>`).join('');
+  const cur = s.status === 'drafting' ? s.currentPick + 1 : -1;
+  let rows = '';
+  for (let r = 1; r <= E.ROUNDS; r++) {
+    let cells = '';
+    for (let c = 0; c < n; c++) {
+      const idxInRound = r % 2 === 1 ? c : n - 1 - c;
+      const overall = (r - 1) * n + idxInRound + 1;
+      const pk = byOverall[overall];
+      if (pk) {
+        const p = player(pk.playerId);
+        cells += `<td><div class="bc u-${UNIT[p.pos]}" title="${esc(p.name)}"><div class="bn">${esc(shortName(p.name))}</div><div class="flex justify-between text-muted"><span>${esc(p.detail)}</span><span class="num">${p.ovr}</span></div></div></td>`;
+      } else {
+        cells += `<td><div class="bc ${overall === cur ? 'now' : 'empty'}"><div class="text-muted num">${r}.${String(idxInRound + 1).padStart(2, '0')}</div></div></td>`;
+      }
+    }
+    rows += `<tr><td class="rd">R${r} ${r % 2 === 1 ? '→' : '←'}</td>${cells}</tr>`;
+  }
+  $('#board').innerHTML = `<table class="board"><thead><tr><th class="!min-w-0"></th>${head}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderComplete() {
+  const s = app.state;
+  const el = $('#complete');
+  if (s.status !== 'complete') { el.innerHTML = ''; return; }
+  const table = E.leagueTable(s, app.poolMap);
+  el.innerHTML = `
+    <div class="p-4 border-b border-line">
+      <div class="flex flex-wrap items-baseline gap-3 justify-between">
+        <h2 class="font-display font-extrabold text-3xl">Final grades</h2>
+        <span class="hint">Grades rank each team by average starter rating.</span>
+      </div>
+      <div class="overflow-x-auto mt-3 max-h-72 scroll-y">
+        <table class="pool-table"><thead><tr><th>Rank</th><th>Team</th><th>Grade</th><th>Starters</th><th>Offense</th><th>Defense</th></tr></thead>
+        <tbody>${table.map(r => `<tr class="${isMine(r.teamId) ? 'font-bold' : ''}"><td class="num">${r.rank}</td><td><button class="underline-offset-2 hover:underline text-left" data-action="show-team" data-team="${r.teamId}">${esc(r.isBot ? '🤖 ' + r.name : r.name)}</button></td><td><span class="ovr ${r.rank <= Math.ceil(table.length / 10) ? 'ovr-elite' : 'ovr-good'}">${r.grade}</span></td><td class="num">${fmt(r.starters)}</td><td class="num">${fmt(r.off)}</td><td class="num">${fmt(r.def)}</td></tr>`).join('')}</tbody></table>
+      </div>
+    </div>`;
+}
+
+function markFresh(pick) {
+  app.freshSlot = { teamId: pick.teamId, slot: pick.slot };
+  setTimeout(() => { if (app.freshSlot && app.freshSlot.slot === pick.slot && app.freshSlot.teamId === pick.teamId) app.freshSlot = null; }, 900);
+}
+
+// ---------- Actions ----------
+function draftPlayer(id) {
+  const oc = onClock();
+  if (!oc || !isMine(oc.teamId)) return;
+  const p = player(id);
+  if (app.mode === 'local') {
+    try {
+      const pick = E.makePick(app.state, app.poolMap, id, { teamId: oc.teamId, by: 'human' });
+      markFresh(pick);
+      app.viewTeam = oc.teamId;
+      toast(`Drafted ${p.name} into ${E.SLOTS.find(s => s.key === pick.slot).label}`);
+      afterLocal();
+    } catch (e) { toast(e.message, 'err'); }
+  } else {
+    app.viewTeam = oc.teamId;
+    emit('draft:pick', { playerId: id }).then(res => { if (res.ok) toast(`Drafted ${p.name}`); });
+  }
+}
+
+function showExport() {
+  const data = JSON.stringify(E.exportResults(app.state, app.poolMap), null, 2);
+  const serverLink = app.mode === 'online' ? `<a class="btn btn-sm" href="/api/sessions/${esc(app.room)}/export" download>Download file</a>` : '';
+  $('#overlay').innerHTML = `
+    <div class="modal-bg" data-action="close-modal">
+      <div class="card p-5 w-full max-w-2xl" role="dialog" aria-modal="true" aria-label="Export results">
+        <div class="flex justify-between items-center mb-3"><h2 class="font-display font-extrabold text-2xl">Export results</h2><button class="btn btn-sm" data-action="close-modal">Close</button></div>
+        <p class="hint mb-2">Draft order, every pick, all 25-man rosters, and grades as JSON.</p>
+        <textarea id="export-text" class="field font-mono text-xs h-80" readonly>${esc(data)}</textarea>
+        <div class="flex gap-2 mt-3"><button class="btn btn-primary btn-sm" data-action="copy-export">Copy JSON</button>${serverLink}</div>
+      </div>
+    </div>`;
+}
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const a = el.dataset.action;
+  if (el.tagName === 'SELECT' || el.type === 'file' || a === 'pool-file') return;
+  switch (a) {
+    case 'theme': toggleTheme(); break;
+    case 'setup-tab': app.setupTab = el.dataset.tab; renderSetup(); break;
+    case 'dice': app.setup.seed = E.randomSeed(); renderSetup(); break;
+    case 'clear-pool': app.customPool = null; renderSetup(); break;
+    case 'start-local': startLocal(); break;
+    case 'resume-local': resumeLocal(); break;
+    case 'discard-local': LS.del(LOCAL_KEY); renderSetup(); break;
+    case 'create-room': createRoom(); break;
+    case 'join-room': joinRoom(); break;
+    case 'claim': emit('team:claim', { teamId: el.dataset.team }); break;
+    case 'release': emit('team:release'); break;
+    case 'start-online': emit('draft:start'); break;
+    case 'leave': leaveOnline(); break;
+    case 'tab': setTab(el.dataset.tab); break;
+    case 'pos': app.filters.pos = el.dataset.pos; app.limit = 150; renderChips(); renderPool(); $('#pool-wrap').scrollTop = 0; break;
+    case 'more': app.limit += 150; renderPool(); break;
+    case 'draft': draftPlayer(el.dataset.id); break;
+    case 'show-team': app.viewTeam = el.dataset.team; renderRoster(); break;
+    case 'pause':
+      if (app.mode === 'local') { app.state.paused = !app.state.paused; afterLocal(); }
+      else emit('draft:pause', { paused: !app.state.paused });
+      break;
+    case 'autopick':
+      if (app.mode === 'local') localAuto('auto');
+      else emit('draft:autopick');
+      break;
+    case 'undo':
+      if (app.mode === 'local') {
+        try { const pk = E.undoLastPick(app.state); app.state.paused = true; toast(`Undid ${player(pk.playerId).name}. Draft paused.`); afterLocal(); }
+        catch (err) { toast(err.message, 'err'); }
+      } else emit('draft:undo').then(r => { if (r.ok) toast('Last pick undone. Draft paused.'); });
+      break;
+    case 'new-draft':
+      clearTimeout(app.botTimer); app.mode = null; app.state = null; app.screen = 'setup'; render(); break;
+    case 'export': showExport(); break;
+    case 'copy-export': {
+      const ta = $('#export-text'); ta.select();
+      const done = () => toast('Copied JSON');
+      if (navigator.clipboard) navigator.clipboard.writeText(ta.value).then(done, () => { try { document.execCommand('copy'); done(); } catch (x) { toast('Select the text and copy it', 'err'); } });
+      else { try { document.execCommand('copy'); done(); } catch (x) { toast('Select the text and copy it', 'err'); } }
+      break;
+    }
+    case 'close-modal': if (e.target === el || el.tagName === 'BUTTON') $('#overlay').innerHTML = ''; break;
+  }
+});
+
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (el.dataset.nameIdx != null) { app.setup.names[Number(el.dataset.nameIdx)] = el.value; return; }
+  if (el.dataset.bind) {
+    const k = el.dataset.bind;
+    const numeric = ['numTeams', 'humans', 'pickTimer', 'botDelay', 'onlineHumans'];
+    app.setup[k] = numeric.indexOf(k) >= 0 ? Number(el.value) : el.value;
+    if (k === 'joinCode') { el.value = el.value.toUpperCase(); app.setup.joinCode = el.value; }
+    if (k === 'numTeams' && $('#numTeamsVal')) $('#numTeamsVal').textContent = el.value;
+    return;
+  }
+  if (el.dataset.filter === 'q') { app.filters.q = el.value; app.limit = 150; renderPool(); }
+});
+
+document.addEventListener('change', e => {
+  const el = e.target;
+  if (el.dataset.bind) {
+    const st = app.setup;
+    st.numTeams = E.clampInt(st.numTeams, 2, 32, 12);
+    st.humans = E.clampInt(st.humans, 0, st.numTeams, 1);
+    st.onlineHumans = E.clampInt(st.onlineHumans, 1, st.numTeams, 2);
+    if (['numTeams', 'humans'].indexOf(el.dataset.bind) >= 0) renderSetup();
+    return;
+  }
+  if (el.dataset.filter === 'team' || el.dataset.filter === 'sort') { app.filters[el.dataset.filter] = el.value; renderPool(); return; }
+  if (el.dataset.filter === 'fit') { app.filters.fit = el.checked; renderPool(); return; }
+  if (el.dataset.action === 'view-team') { app.viewTeam = el.value; renderRoster(); return; }
+  if (el.dataset.action === 'pool-file' && el.files && el.files[0]) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const pool = E.normalizePool(JSON.parse(reader.result));
+        const check = E.validatePool(pool, app.setup.numTeams);
+        app.customPool = pool;
+        renderSetup();
+        toast(check.ok ? `Loaded ${pool.length} players` : `Loaded ${pool.length} players. Too few for ${app.setup.numTeams} teams: ${check.problems[0]}`, check.ok ? '' : 'err');
+      } catch (err) { toast('Could not read that file: ' + err.message, 'err'); }
+    };
+    reader.readAsText(el.files[0]);
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && $('#overlay').innerHTML) $('#overlay').innerHTML = '';
+  if (e.key === '/' && app.screen === 'draft' && document.activeElement.tagName !== 'INPUT') {
+    e.preventDefault(); const q = $('[data-filter="q"]'); if (q) q.focus();
+  }
+});
+
+// ---------- Root render ----------
+function render() {
+  renderHeader();
+  if (app.screen === 'setup') renderSetup();
+  else if (app.screen === 'lobby') renderLobby();
+  else { renderDraftShell(); app.lastOnClock = undefined; updateDraft(); }
+}
+
+setInterval(() => { if (app.screen === 'draft') renderTimer(); }, 250);
+
+async function init() {
+  setPool(PD.buildPool(), 'built-in');
+  render();
+  app.serverAvailable = await detectServer();
+  const params = new URLSearchParams(location.search);
+  const saved = LS.get(ONLINE_KEY);
+  if (app.serverAvailable) {
+    if (params.get('room')) { app.setup.joinCode = params.get('room').toUpperCase(); app.setupTab = 'online'; }
+    if (saved && saved.room && (!params.get('room') || params.get('room').toUpperCase() === saved.room)) {
+      app.mode = 'online'; app.room = saved.room; app.token = saved.token;
+      connectSocket();
+    }
+  }
+  if (app.screen === 'setup') renderSetup();
+}
+init();
+})();
+</script>
+</body>
+</html>
