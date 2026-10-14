@@ -488,7 +488,7 @@ function startSolo() {
   E.startDraft(state);
   mountSolo(state, name);
   saveSolo();
-  render();
+  soloCascade(); // advance any CPU picks before the human's first turn
   toast('Solo draft started — good luck', true);
 }
 function resumeSolo() {
@@ -508,6 +508,7 @@ function exitSolo() {
 // Human picked -> cascade CPU picks until it's the human's turn again.
 function soloCascade() {
   const s = VIEW.state;
+  if (!s || s.paused || s.status !== 'drafting') { saveSolo(); render(); return; }
   let guard = 0;
   while (s.status === 'drafting' && guard++ < 10000) {
     const oc = E.onClock(s);
@@ -749,7 +750,11 @@ function renderDraftActions() {
   const emit = (ev, data) => () => socket.emit(ev, data || {}, r => r && !r.ok && toast(r.error));
   if (s.status === 'drafting') {
     if (SOLO) {
-      mk(s.paused ? 'Resume' : 'Pause', () => { s.paused = !s.paused; saveSolo(); render(); });
+      mk(s.paused ? 'Resume' : 'Pause', () => {
+        s.paused = !s.paused;
+        if (!s.paused) soloCascade(); // resume CPU picks if a bot is on the clock
+        else { saveSolo(); render(); }
+      });
       mk('Auto-pick now', soloAutoPick);
       mk('Undo last pick', () => {
         try { E.undoLastPick(s); s.paused = true; }
