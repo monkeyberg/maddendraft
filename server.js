@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
 const E = require('./draft-engine');
+const S = require('./season-engine');
 const PlayerData = require('./player-data');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -129,6 +130,7 @@ app.use(express.json({ limit: '1mb' }));
 const sendFile = name => (req, res) => res.sendFile(path.join(__dirname, name));
 app.get(['/', '/index.html'], sendFile('index.html'));
 app.get('/shared/draft-engine.js', sendFile('draft-engine.js'));
+app.get('/shared/season-engine.js', sendFile('season-engine.js'));
 app.get('/shared/player-data.js', sendFile('player-data.js'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true, pool: POOL.length, poolSource: POOL_SOURCE, sessions: sessions.size }));
@@ -286,6 +288,43 @@ io.on('connection', socket => {
       after(sess);
       ack && ack({ ok: true });
     } catch (e) { fail(ack, e.message); }
+  });
+
+  // ---------- Season ----------
+  const needSeasonHost = (ack) => {
+    const { sess, member } = ctx();
+    if (!member) { fail(ack, 'Join a room first'); return null; }
+    if (!member.isHost) { fail(ack, 'Only the host controls the season'); return null; }
+    if (sess.state.status !== 'complete') { fail(ack, 'Finish the draft first'); return null; }
+    return sess;
+  };
+
+  socket.on('season:advance', (_, ack) => {
+    const sess = needSeasonHost(ack);
+    if (!sess) return;
+    try {
+      const result = S.advance(sess.state, POOL_MAP);
+      after(sess);
+      ack && ack({ ok: true, result, season: sess.state.season });
+    } catch (e) { fail(ack, e.message); }
+  });
+
+  socket.on('season:simall', (_, ack) => {
+    const sess = needSeasonHost(ack);
+    if (!sess) return;
+    try {
+      S.simAll(sess.state, POOL_MAP);
+      after(sess);
+      ack && ack({ ok: true, season: sess.state.season });
+    } catch (e) { fail(ack, e.message); }
+  });
+
+  socket.on('season:reset', (_, ack) => {
+    const sess = needSeasonHost(ack);
+    if (!sess) return;
+    S.resetSeason(sess.state);
+    after(sess);
+    ack && ack({ ok: true });
   });
 
   socket.on('disconnect', () => {
