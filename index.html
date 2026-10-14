@@ -261,6 +261,18 @@ footer{border-top:1px solid var(--line);padding:26px 0;color:var(--dim);font-siz
         <div class="field"><label>Room code</label><input id="j-code" placeholder="e.g. XK7Q2" maxlength="5" style="text-transform:uppercase;letter-spacing:.2em;font-weight:700"></div>
         <button class="btn btn-gold" id="btn-join" style="width:100%">Join league →</button>
       </div>
+      <div class="card" style="grid-column:1/-1">
+        <h3>🎯 Solo mode</h3>
+        <div class="sub">No friends, no room, no waiting — just you vs. the CPU. Draft and sim a full season right here in your browser. Progress auto-saves.</div>
+        <div class="frow" style="max-width:560px">
+          <div class="field"><label>Your name</label><input id="s-name" placeholder="e.g. Eric" maxlength="32"></div>
+          <div class="field"><label>Teams</label><select id="s-teams"><option>4</option><option>6</option><option>8</option><option selected>10</option><option>12</option><option>16</option><option>20</option><option>32</option></select></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-acc" id="btn-solo">Start solo draft →</button>
+          <button class="btn btn-dim" id="btn-solo-resume" hidden>Resume saved solo</button>
+        </div>
+      </div>
     </div>
     <div class="feats">
       <div class="feat"><div class="ic">📋</div><b>Snake draft</b><span>25 rounds, live picks, smart bots fill empty seats.</span></div>
@@ -405,13 +417,118 @@ function copyInvite() {
 $('copylink').onclick = copyInvite;
 $('copylink2').onclick = copyInvite;
 
+/* ================= solo mode (offline, you vs CPU) ================= */
+let SOLO = false;
+const SOLO_SAVE_KEY = 'fr_solo_v1';
+
+function saveSolo() {
+  if (!SOLO || !VIEW) return;
+  try { localStorage.setItem(SOLO_SAVE_KEY, JSON.stringify(VIEW.state)); } catch (e) {}
+}
+function loadSoloState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SOLO_SAVE_KEY));
+    return s && s.id === 'SOLO' ? s : null;
+  } catch (e) { return null; }
+}
+function mountSolo(state, name) {
+  SOLO = true;
+  ME.roomId = 'SOLO'; ME.token = null; ME.memberId = 'solo-me'; ME.name = name;
+  VIEW = {
+    state,
+    members: [{ id: 'solo-me', name, teamId: 'T1', isHost: true, online: true }],
+    deadline: null, serverNow: Date.now()
+  };
+  socket.emit('room:leave', {}, () => {});
+  history.replaceState(null, '', '/');
+}
+function startSolo() {
+  const name = ($('s-name').value.trim() || 'You').slice(0, 32);
+  const numTeams = +$('s-teams').value;
+  const state = E.createSession({ id: 'SOLO', numTeams, humanSlots: 1 });
+  E.claimTeam(state, 'T1', name);
+  E.startDraft(state);
+  mountSolo(state, name);
+  saveSolo();
+  render();
+  toast('Solo draft started — good luck', true);
+}
+function resumeSolo() {
+  const state = loadSoloState();
+  if (!state) return toast('No saved solo draft found');
+  const name = (E.getTeam(state, 'T1') || {}).name || 'You';
+  mountSolo(state, name);
+  render();
+  toast('Solo draft resumed', true);
+}
+function exitSolo() {
+  if (!confirm('Quit solo mode? Your progress is saved and can be resumed.')) return;
+  SOLO = false; VIEW = null;
+  ME.roomId = null; ME.memberId = null;
+  render();
+}
+// Human picked -> cascade CPU picks until it's the human's turn again.
+function soloCascade() {
+  const s = VIEW.state;
+  let guard = 0;
+  while (s.status === 'drafting' && guard++ < 10000) {
+    const oc = E.onClock(s);
+    if (!oc) break;
+    const team = E.getTeam(s, oc.teamId);
+    if (!team.isBot) break;
+    const id = E.botChoose(s, POOL, POOLMAP, oc.teamId);
+    if (!id) break;
+    E.makePick(s, POOLMAP, id, { by: 'bot' });
+  }
+  saveSolo();
+  render();
+}
+function soloHumanPick(playerId) {
+  const s = VIEW.state;
+  try {
+    E.makePick(s, POOLMAP, playerId, { teamId: 'T1', by: 'human' });
+  } catch (e) { toast(e.message); return; }
+  soloCascade();
+}
+function soloAutoPick() {
+  const s = VIEW.state;
+  const oc = E.onClock(s);
+  if (!oc || oc.teamId !== 'T1') return toast('It is not your pick');
+  const id = E.botChoose(s, POOL, POOLMAP, 'T1');
+  if (!id) return toast('No legal pick available');
+  soloHumanPick(id);
+}
+// Unified season controls: local in solo, socket in multiplayer.
+function doSeason(kind) {
+  if (SOLO) {
+    const s = VIEW.state;
+    try {
+      if (kind === 'advance') S.advance(s, POOLMAP);
+      else if (kind === 'simall') S.simAll(s, POOLMAP);
+      else if (kind === 'reset') {
+        if (!confirm('Reset the season and simulate again?')) return;
+        S.resetSeason(s);
+      }
+    } catch (e) { toast(e.message); return; }
+    saveSolo();
+    render();
+  } else {
+    const go = () => socket.emit('season:' + kind, {}, r => r && !r.ok && toast(r.error));
+    if (kind === 'reset') { if (confirm('Reset the season and simulate again?')) go(); }
+    else go();
+  }
+}
+$('btn-solo').onclick = startSolo;
+$('btn-solo-resume').onclick = resumeSolo;
+
 /* ================= render root ================= */
 function render() {
   const pill = $('roompill');
   if (VIEW) {
     pill.classList.add('on');
-    $('roomcode').textContent = VIEW.state.id;
-    $('invitelink').textContent = inviteLink();
+    $('roomcode').textContent = SOLO ? 'SOLO' : VIEW.state.id;
+    $('copylink').style.display = SOLO ? 'none' : '';
+    if (!SOLO) $('invitelink').textContent = inviteLink();
     const st = VIEW.state.status;
     const compareOpen = !$('screen-compare').hidden;
     if (compareOpen) { renderCompare(); return; }
@@ -494,7 +611,10 @@ function renderOnClock() {
     ${mine ? `<button class="btn btn-dim" id="btn-auto">Auto-pick for me</button>` : ''}
     ${secs != null ? `<div class="timer ${secs <= 10 ? 'low' : ''}">${secs}s</div>` : ''}`;
   const ab = $('btn-auto');
-  if (ab) ab.onclick = () => socket.emit('draft:autopick', {}, r => r && !r.ok && toast(r.error));
+  if (ab) ab.onclick = () => {
+    if (SOLO) soloAutoPick();
+    else socket.emit('draft:autopick', {}, r => r && !r.ok && toast(r.error));
+  };
 }
 
 function poolList() {
@@ -532,6 +652,7 @@ function renderPool() {
   el.innerHTML = h || `<div class="empty">No players match.</div>`;
   el.querySelectorAll('.prow.pickable').forEach(row => {
     row.onclick = () => {
+      if (SOLO) { soloHumanPick(row.dataset.pid); return; }
       socket.emit('draft:pick', { playerId: row.dataset.pid }, r => {
         if (!r || !r.ok) toast(r && r.error || 'Pick failed');
       });
@@ -581,17 +702,29 @@ function renderDraftActions() {
   const el = $('draft-actions'); el.innerHTML = '';
   if (!isHost()) return;
   const s = VIEW.state;
-  const mk = (label, ev, data, cls) => {
+  const mk = (label, fn, cls) => {
     const b = document.createElement('button');
     b.className = 'btn ' + (cls || 'btn-dim'); b.textContent = label;
-    b.onclick = () => socket.emit(ev, data || {}, r => r && !r.ok && toast(r.error));
+    b.onclick = fn;
     el.appendChild(b);
   };
+  const emit = (ev, data) => () => socket.emit(ev, data || {}, r => r && !r.ok && toast(r.error));
   if (s.status === 'drafting') {
-    mk(s.paused ? 'Resume' : 'Pause', 'draft:pause', { paused: !s.paused });
-    mk('Auto-pick now', 'draft:autopick');
-    mk('Undo last pick', 'draft:undo', {}, 'btn-danger');
+    if (SOLO) {
+      mk(s.paused ? 'Resume' : 'Pause', () => { s.paused = !s.paused; saveSolo(); render(); });
+      mk('Auto-pick now', soloAutoPick);
+      mk('Undo last pick', () => {
+        try { E.undoLastPick(s); s.paused = true; }
+        catch (e) { toast(e.message); }
+        saveSolo(); render();
+      }, 'btn-danger');
+    } else {
+      mk(s.paused ? 'Resume' : 'Pause', emit('draft:pause', { paused: !s.paused }));
+      mk('Auto-pick now', emit('draft:autopick'));
+      mk('Undo last pick', emit('draft:undo'), 'btn-danger');
+    }
   }
+  if (SOLO) mk('Exit solo', exitSolo, 'btn-dim');
 }
 
 /* ================= season ================= */
@@ -608,8 +741,8 @@ function renderSeason() {
     $('powrank').innerHTML = E.leagueTable(s, POOLMAP).map((r, i) =>
       `<div class="stat"><span class="k">#${r.rank} ${esc(r.name)} ${r.isBot ? '(CPU)' : ''}</span><span class="v ${i === 0 ? 'hi' : ''}">${r.grade} • ${r.starters}</span></div>`).join('');
     const b1 = $('sz-sim1'), ba = $('sz-simall');
-    if (b1) b1.onclick = () => socket.emit('season:advance', {}, r => r && !r.ok && toast(r.error));
-    if (ba) ba.onclick = () => socket.emit('season:simall', {}, r => r && !r.ok && toast(r.error));
+    if (b1) b1.onclick = () => doSeason('advance');
+    if (ba) ba.onclick = () => doSeason('simall');
     return;
   }
   const table = S.standings(s);
@@ -635,7 +768,8 @@ function renderSeason() {
   h += `<div class="sec-head"><div><h2>Season HQ</h2><p>${season.status === 'regular' ? `Week ${season.cur} of ${season.weeks.length} in the books` : season.status === 'playoffs' ? 'Playoffs are live' : 'Season complete'}</p></div>
     <div class="szn-ctl">${isHost() && !done ? `<button class="btn btn-acc" id="sz-sim1">Sim next</button><button class="btn btn-gold" id="sz-simall">Sim rest</button>` : ''}
     ${isHost() && done ? `<button class="btn btn-dim" id="sz-reset">↻ Run it back</button>` : ''}
-    <button class="btn btn-dim" id="sz-cmp">⚖️ Compare teams</button></div></div>`;
+    <button class="btn btn-dim" id="sz-cmp">⚖️ Compare teams</button>
+    ${SOLO ? `<button class="btn btn-dim" id="sz-exit">Exit solo</button>` : ''}</div></div>`;
 
   const playedWeeks = season.weeks.filter(w => w.games.every(g => g.played));
   if (seasonWeek !== 'final' && seasonWeek !== 'playoffs') {
@@ -686,11 +820,12 @@ function renderSeason() {
   el.innerHTML = h;
 
   el.querySelectorAll('.wpill').forEach(b => b.onclick = () => { seasonWeek = b.dataset.w; renderSeason(); });
-  const b1 = $('sz-sim1'), ba = $('sz-simall'), br = $('sz-reset'), bc = $('sz-cmp');
-  if (b1) b1.onclick = () => socket.emit('season:advance', {}, r => r && !r.ok && toast(r.error));
-  if (ba) ba.onclick = () => socket.emit('season:simall', {}, r => r && !r.ok && toast(r.error));
-  if (br) br.onclick = () => { if (confirm('Reset the season and simulate again?')) socket.emit('season:reset', {}, r => r && !r.ok && toast(r.error)); };
+  const b1 = $('sz-sim1'), ba = $('sz-simall'), br = $('sz-reset'), bc = $('sz-cmp'), bx = $('sz-exit');
+  if (b1) b1.onclick = () => doSeason('advance');
+  if (ba) ba.onclick = () => doSeason('simall');
+  if (br) br.onclick = () => doSeason('reset');
   if (bc) bc.onclick = () => { initCompare(); show('screen-compare'); };
+  if (bx) bx.onclick = exitSolo;
 }
 $('back-season').onclick = () => { show('screen-season'); renderSeason(); };
 
@@ -748,7 +883,7 @@ socket.on('state', view => { VIEW = view; render(); });
 socket.on('connect', () => {
   const q = new URLSearchParams(location.search).get('room');
   if (q && !VIEW) $('j-code').value = q.toUpperCase();
-  if (ME.roomId && ME.token) socket.emit('room:join', { roomId: ME.roomId, token: ME.token, name: ME.name || 'Guest' }, res => {
+  if (!SOLO && ME.roomId && ME.token) socket.emit('room:join', { roomId: ME.roomId, token: ME.token, name: ME.name || 'Guest' }, res => {
     if (res && res.ok) { ME.memberId = res.memberId; VIEW = res.view; render(); }
     else { ME.roomId = null; render(); }
   });
@@ -774,6 +909,7 @@ fetch('/api/pool').then(r => r.json()).then(p => {
   p.forEach(x => POOLMAP[x.id] = x);
   const q = new URLSearchParams(location.search).get('room');
   if (q) $('j-code').value = q.toUpperCase();
+  if (loadSoloState()) $('btn-solo-resume').hidden = false;
   render();
 }).catch(() => toast('Could not load player pool'));
 </script>

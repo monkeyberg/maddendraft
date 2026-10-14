@@ -10,6 +10,8 @@ Start a Madden-style franchise with your friends: create a league, share an invi
 4. **Season HQ** — sim week-by-week or the whole season at once. Weekly scores, standings, playoff bracket, superlatives, champion banner.
 5. **Compare** — pick any two teams for a head-to-head breakdown: record, PF/PA, roster overalls, top players, head-to-head results.
 
+**Solo mode** — no friends needed. Hit "Start solo draft" on the home page to draft against the CPU and sim the season entirely in your browser. Progress auto-saves to localStorage so you can resume later.
+
 ## Run locally
 
 ```bash
